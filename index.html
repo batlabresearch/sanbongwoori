@@ -3483,6 +3483,7 @@ function updateTiles() {
     const d = away(tile);
     tile.small.visible = d < PLANT_RANGE;
     tile.fine.visible = d < FINE_RANGE;
+    if (tile.high.visible !== d < HIGH_RANGE && nearShadow(tile)) shadowDirty = true;
     tile.high.visible = d < HIGH_RANGE;
     tile.low.visible = !tile.high.visible;
   }
@@ -3493,7 +3494,11 @@ function pumpJobs(budget) {
     const tile = jobs[0];
     if (tile.dead) { jobs.shift(); continue; }
     tile.job ??= buildTile(tile);
-    if (tile.job.next().done) { tile.ready = true; jobs.shift(); }
+    if (tile.job.next().done) {
+      tile.ready = true;
+      jobs.shift();
+      if (nearShadow(tile)) shadowDirty = true;
+    }
   }
 }
 
@@ -5506,12 +5511,52 @@ function poseHuman(model, phase, swing, lean, time) {
   }
 }
 
+/* ---------- 움직이는 몸의 그림자: 몸을 햇빛 방향으로 발밑 땅에 눌러 붙여 그린다 ---------- */
+// 해 그림자 지도는 가끔만 다시 그리므로, 걷는 등산객과 동물은 이 그림자를 쓴다
+const flatShadowCompile = material => shader => {
+  shader.uniforms.uGround = material.userData.ground;
+  shader.uniforms.uNormal = material.userData.normal;
+  shader.uniforms.uSun = { value: SUN };
+  shader.vertexShader = 'uniform vec3 uGround;\nuniform vec3 uNormal;\nuniform vec3 uSun;\n' + shader.vertexShader.replace('#include <project_vertex>', `
+    vec4 world = modelMatrix * vec4(transformed, 1.0);
+    float lift = max(dot(world.xyz - uGround, uNormal), 0.0);
+    world.xyz += uNormal * .025 - uSun * (lift / max(dot(uSun, uNormal), .25));
+    vec4 mvPosition = viewMatrix * world;
+    gl_Position = projectionMatrix * mvPosition;`);
+};
+function addFlatShadow(mesh, root) {
+  // 겹친 곳이 두 번 어두워지지 않게, 같은 높이의 그림자 조각은 한 번만 칠한다
+  const material = new THREE.MeshBasicMaterial({ color: '#131b0f', transparent: true, opacity: .36, depthFunc: THREE.LessDepth, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+  material.userData = { ground: { value: new THREE.Vector3() }, normal: { value: new THREE.Vector3(0, 1, 0) } };
+  material.onBeforeCompile = flatShadowCompile(material);
+  material.customProgramCacheKey = () => 'flat-shadow';
+  const shade = new THREE.SkinnedMesh(mesh.geometry, material);
+  shade.frustumCulled = false;
+  shade.bind(mesh.skeleton, mesh.bindMatrix);
+  shade.visible = false;
+  root.add(shade);
+  return shade;
+}
+// 그림자를 붙일 땅의 기울기는 발밑 네 곳의 높이로 구한다. 카메라에서 멀면 그리지 않는다
+function placeFlatShadow(shade, x, y, z, show) {
+  shade.visible = show && Math.hypot(x - camera.position.x, z - camera.position.z) < 70;
+  if (!shade.visible) return;
+  const e = .45, dx = groundHeight(x + e, z) - groundHeight(x - e, z), dz = groundHeight(x, z + e) - groundHeight(x, z - e);
+  shade.material.userData.ground.value.set(x, y, z);
+  shade.material.userData.normal.value.set(-dx, e * 2, -dz).normalize();
+}
+
 class Hiker {
   constructor(look) {
     Object.assign(this, look);
     this.model = makeHikerModel(look);
+    this.dressShadow();
     scene.add(this.model.root);
     this.seed = rng() * 10;
+  }
+  dressShadow() {
+    this.model.mesh.castShadow = false;
+    this.model.shade = addFlatShadow(this.model.mesh, this.model.root);
   }
   reset(stamina, s) {
     const p = trailAt(s);
@@ -5530,12 +5575,17 @@ class Hiker {
   sync() {
     this.model.root.position.set(this.x, this.y, this.z);
     this.model.root.rotation.y = this.yaw;
+    const { shade, mesh } = this.model;
+    if (shade.geometry !== mesh.geometry) shade.geometry = mesh.geometry;
+    placeFlatShadow(shade, this.x, this.y - .02, this.z, this.model.root.visible);
   }
   setLook(next) {
     Object.assign(this, next);
     if (next.gender === this.model.gender) { dressModel(this.model, next); return; }
     scene.remove(this.model.root);
+    this.model.shade.material.dispose();
     this.model = makeHikerModel(next);
+    this.dressShadow();
     scene.add(this.model.root);
   }
   animate(dt, moved) {
@@ -6462,11 +6512,11 @@ function makeBeast(kind) {
   const root = new THREE.Group(), mesh = new THREE.SkinnedMesh(parts.geometry, coatMaterial);
   root.rotation.order = 'YXZ';
   mesh.frustumCulled = false;
-  mesh.castShadow = true;
   mesh.add(bones[0]);
   root.add(mesh);
   root.updateMatrixWorld(true);
   mesh.bind(new THREE.Skeleton(bones));
+  const shade = kind.flies ? null : addFlatShadow(mesh, root);
   root.scale.setScalar(kind.scale ?? 1);
   let glow = null;
   if (kind.myth) {
@@ -6474,7 +6524,7 @@ function makeBeast(kind) {
     glow.frustumCulled = false;
     root.add(glow);
   }
-  return { root, mesh, bones, glow, rest: bones.map(b => b.position.clone()) };
+  return { root, mesh, bones, glow, shade, rest: bones.map(b => b.position.clone()) };
 }
 const WALK_BEAT = [.25, .75, 0, .5], RUN_BEAT = [0, .1, .52, .62];   // 왼앞, 오른앞, 왼뒤, 오른뒤
 
@@ -7089,7 +7139,12 @@ function stepWild(dt) {
   }
   for (let i = bugs.length - 1; i >= 0; i--) if (stepBug(bugs[i], dt)) dropBug(i);
   for (let i = beasts.length - 1; i >= 0; i--) {
-    if (beasts[i].step(dt)) { beasts[i].retire(); beasts[i] = beasts[beasts.length - 1]; beasts.pop(); }
+    if (beasts[i].step(dt)) { beasts[i].retire(); beasts[i] = beasts[beasts.length - 1]; beasts.pop(); continue; }
+    const { shade, root } = beasts[i];
+    if (shade) {
+      const ground = groundHeight(root.position.x, root.position.z);
+      placeFlatShadow(shade, root.position.x, ground, root.position.z, root.visible && root.position.y - ground < .4);
+    }
   }
 }
 function clearWild() {
@@ -7202,17 +7257,26 @@ class Sound {
     source.loop = true;
     return source;
   }
+  // 바람은 세기와 높낮이가 천천히 오르내린다. 같은 크기로 쏴 하고 이어지면 물소리처럼 들린다
   startWind() {
-    const { ctx } = this, source = this.noiseLoop(4, .985);
+    const { ctx } = this, source = this.noiseLoop(4, .96);
     const band = ctx.createBiquadFilter();
-    band.type = 'bandpass'; band.frequency.value = 520; band.Q.value = .5;
+    band.type = 'bandpass'; band.frequency.value = 330; band.Q.value = 1.4;
     this.wind = ctx.createGain();
-    this.wind.gain.value = .035;
-    const swell = ctx.createOscillator(), depth = ctx.createGain();
-    swell.frequency.value = .11; depth.gain.value = .016;
-    swell.connect(depth).connect(this.wind.gain);
+    this.wind.gain.value = 0;
+    this.gust = ctx.createGain();
+    this.gust.gain.value = 0;
+    // 느린 물결 두 개를 더해 돌풍 곡선을 만들고, 세기와 소리 높이를 함께 흔든다
+    const slow = ctx.createOscillator(), quick = ctx.createOscillator(), mix = ctx.createGain(), sweep = ctx.createGain();
+    slow.frequency.value = .061; quick.frequency.value = .17;
+    mix.gain.value = .5;
+    sweep.gain.value = 170;
+    slow.connect(mix); quick.connect(mix);
+    mix.connect(this.gust).connect(this.wind.gain);
+    mix.connect(sweep).connect(band.frequency);
     source.connect(band).connect(this.wind).connect(this.master);
-    source.start(); swell.start();
+    source.start(); slow.start(); quick.start();
+    this.setHeight(0);
   }
   startWater() {
     const { ctx } = this, rush = this.noiseLoop(6, .55), babble = this.noiseLoop(5, .8);
@@ -7249,7 +7313,13 @@ class Sound {
       this.bubbleLoop();
     }, 90 + Math.random() * 260);
   }
-  setHeight(u) { if (this.wind) this.wind.gain.setTargetAtTime(.035 + u * .05, this.ctx.currentTime, 1.5); }
+  // 숲 아래쪽은 바람이 거의 없고, 높이 오를수록 세진다
+  setHeight(u) {
+    if (!this.wind) return;
+    const base = .006 + u * u * .05, now = this.ctx.currentTime;
+    this.wind.gain.setTargetAtTime(base, now, 1.5);
+    this.gust.gain.setTargetAtTime(base * .8, now, 1.5);
+  }
   // 배경: 멀리서 들리는 잔잔한 새소리가 끊이지 않는다
   chorusLoop(delay) {
     setTimeout(() => {
@@ -7583,6 +7653,12 @@ function stepPlayer(dt) {
     player.grade = lerp(player.grade, felt, 1 - Math.exp(-dt * 5));
   } else player.grade = lerp(player.grade, 0, 1 - Math.exp(-dt * 3));
   state.lastGround = groundNow;
+  // 길의 오르내림은 늦추지 않고 그대로 따라가고, 계단 턱과 길 밖 높낮이만 부드럽게 받는다
+  // 순간이동하거나 쉼터에서 일어난 직후처럼 길 위치가 크게 바뀐 프레임은 건너뛴다
+  const base = trailAt(player.s).y;
+  if (Math.abs(player.s - (state.lastS ?? -99)) < 3) player.y += base - state.lastBase;
+  state.lastS = player.s;
+  state.lastBase = base;
   player.y = lerp(player.y, groundNow, 1 - Math.exp(-dt * 16));
   player.animate(dt, moved);
   if (!player.done && player.s >= trail.length - 5) arrive(player);
@@ -8144,6 +8220,7 @@ function portraitOf(kind) {
   root.rotation.set(0, 0, 0);
   root.visible = true;
   glow.visible = false;
+  if (beast.shade) beast.shade.visible = false;
   if (kind.flies) beast.flightPose();
   root.updateMatrixWorld(true);
   beast.mesh.skeleton.update();
@@ -8650,9 +8727,8 @@ function updateCamera(dt) {
   cam.hold = Math.max(0, cam.hold - dt);
   const p = player.model.root.position;
   // 카메라는 발밑 높이 대신 매끈한 길 높이를 따라가 계단에서 덜덜거리지 않는다
-  const rideTo = lerp(trailAt(player.s).y + .02, p.y, smooth(1.5, 3, player.off));
-  cam.ride ??= rideTo;
-  cam.ride = Math.abs(rideTo - cam.ride) > 4 ? rideTo : lerp(cam.ride, rideTo, 1 - Math.exp(-dt * 9));
+  // 길 높이는 이미 매끈하므로 늦추지 않고 그대로 쓴다. 늦추면 프레임 간격에 따라 시선 높이가 출렁인다
+  cam.ride = lerp(trailAt(player.s).y + .02, p.y, smooth(1.5, 3, player.off));
   eye.set(p.x, cam.ride + 1.34, p.z);
   const reach = Math.cos(cam.pitch) * cam.dist;
   if (state.steady) {
@@ -8688,20 +8764,30 @@ function updateCamera(dt) {
   want.set(eye.x + sinYaw * flat * cam.clear, eye.y + Math.sin(pitch) * cam.clear, eye.z + cosYaw * flat * cam.clear);
   want.y = Math.max(want.y, groundHeight(want.x, want.z) + .9);
   state.blend = Math.min(1, state.blend + dt / 1.2);
-  camera.position.lerp(want, state.blend >= 1 ? 1 - Math.exp(-dt * 10) : 1 - Math.exp(-dt * (2.4 + state.blend * 5)));
-  const low = groundHeight(camera.position.x, camera.position.z) + .7;
-  cam.low = lerp(cam.low ?? low, low, 1 - Math.exp(-dt * 10));
-  camera.position.y = Math.max(camera.position.y, cam.low);
+  // 시작할 때만 부드럽게 다가가고, 그 뒤로는 등산객에 단단히 붙어 따라간다. 늦게 따라가면 프레임마다 거리가 달라져 캐릭터가 떨려 보인다
+  if (state.blend >= 1) camera.position.copy(want);
+  else {
+    camera.position.lerp(want, 1 - Math.exp(-dt * (2.4 + state.blend * 5)));
+    camera.position.y = Math.max(camera.position.y, groundHeight(camera.position.x, camera.position.z) + .7);
+  }
   camera.lookAt(eye.x, eye.y + cam.tilt * 2.6, eye.z);
 }
 
+// 해 그림자 지도는 중심이 8m 넘게 옮겨졌거나 가까운 타일이 새로 생겼을 때만 다시 그린다.
+// 걸을 때마다 다시 그리면 내장 그래픽에서 프레임 간격이 번갈아 길어져 화면이 덜덜 떨린다
+let shadowDirty = true;
+const shadowAt = { x: NaN, y: NaN, z: NaN };
 function updateShadowFocus() {
   const p = player.model.root.position;
-  const x = Math.round(p.x / 2) * 2, z = Math.round(p.z / 2) * 2;
-  sunLight.target.position.set(x, p.y, z);
-  sunLight.position.set(x, p.y, z).addScaledVector(SUN, 150);
+  const x = Math.round(p.x / 8) * 8, y = Math.round(p.y / 4) * 4, z = Math.round(p.z / 8) * 8;
+  if (x === shadowAt.x && y === shadowAt.y && z === shadowAt.z) return;
+  Object.assign(shadowAt, { x, y, z });
+  sunLight.target.position.set(x, y, z);
+  sunLight.position.set(x, y, z).addScaledVector(SUN, 150);
   sunLight.target.updateMatrixWorld();
+  shadowDirty = true;
 }
+const nearShadow = tile => Math.abs(tile.ox + TILE / 2 - shadowAt.x) < TILE / 2 + 40 && Math.abs(tile.oz + TILE / 2 - shadowAt.z) < TILE / 2 + 40;
 
 const tagPoint = new THREE.Vector3();
 function updateTags() {
@@ -8749,10 +8835,20 @@ function refreshHud() {
   checkPlaces();
 }
 
-// 계곡, 폭포, 약수터에 가까울수록 물소리가 커진다
+// 물소리는 눈에 보이는 물길, 폭포, 약수터 곁에서만 난다. 물길에서 40m쯤 멀어지면 들리지 않는다
 function waterLevel() {
-  let level = 0;
-  for (const w of trail.water) level = Math.max(level, 1 - smooth(18, 120, Math.abs(w.s - player.s) + w.d));
+  let near = Infinity, level = 0;
+  for (const stream of trail.streams) {
+    if (player.s < stream.a - 90 || player.s > stream.b + 90) continue;
+    for (const p of stream.points) near = Math.min(near, Math.hypot(p.x - player.x, p.z - player.z) - p.w);
+  }
+  if (near < Infinity) level = 1 - smooth(6, 42, near);
+  for (const site of trail.sites) {
+    if (site.x === undefined || Math.abs(site.s - player.s) > 120) continue;
+    const d = Math.hypot(site.x - player.x, site.z - player.z);
+    if (site.kind === 'fall') level = Math.max(level, 1 - smooth(10, 70, d));
+    else if (site.kind === 'spring') level = Math.max(level, .35 * (1 - smooth(3, 16, d)));
+  }
   return level;
 }
 
@@ -9140,7 +9236,8 @@ function frame(now) {
   if (idle && idleTick++ % 2) return;
   const raw = (now - last) / 1000;
   last = now;
-  const dt = Math.min(raw, .05);
+  // 느린 기기에서도 실제 흐른 시간만큼 움직여야 걸음이 고르게 보인다. 멈췄다 돌아온 경우만 끊는다
+  const dt = Math.min(raw, .1);
   if (!REDUCED) time.value += dt;
   if (state.mode === 'hike') {
     if (!state.finished || npcs.some(n => !n.done)) state.elapsed += dt;
@@ -9162,8 +9259,8 @@ function frame(now) {
   tileClock -= dt;
   if (tileClock <= 0) { tileClock = .4; updateTiles(); }
   pumpJobs(SLICE_MS);
-  // 그림자 계산은 프레임 시간의 1/4을 쓴다. 걸을 때는 등산객 그림자가 끊겨 보이지 않을 만큼만 줄인다
-  renderer.shadowMap.needsUpdate = frameStats.frames % (idle ? 3 : 2) === 0;
+  renderer.shadowMap.needsUpdate = shadowDirty;
+  shadowDirty = false;
   renderer.render(scene, camera);
   frameStats.frames++;
   if (idle) return;
