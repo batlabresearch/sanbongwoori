@@ -3,7 +3,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@600;800&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@600;800&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Nanum+Pen+Script&display=swap">
 <style>
 /* Layout: 화면 전체가 산이고, 정보는 등산로 이정표처럼 가장자리에 세운다. */
 :root {
@@ -181,6 +181,9 @@ h1 small { margin-left: 9px; font-family: var(--ui); font-weight: 500; font-size
 .pin.hot path:first-child, .pin.picked path:first-child { fill: var(--ribbon); }
 .pin.picked .pin-mark { transform: scale(calc(var(--pin) * 1.55)); }
 .go-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, 240px) auto; align-items: stretch; gap: 8px; }
+.intro-tools { display: grid; gap: 6px; }
+.intro-tools .tool { min-height: 0; }
+#hd-toggle[aria-pressed="false"] { color: var(--carve-dim); }
 .peak-card { min-width: 0; padding: 8px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-content: center; align-items: center; border: 1px solid var(--line); border-radius: 4px; background: var(--shade); color: var(--carve); font: inherit; text-align: left; }
 .peak-card b { grid-column: 1; font-family: var(--display); font-weight: 800; font-size: 17px; }
 .peak-card span { grid-column: 1; font-size: 13px; color: var(--carve-dim); font-variant-numeric: tabular-nums; }
@@ -366,6 +369,33 @@ h1 small { margin-left: 9px; font-family: var(--ui); font-weight: 500; font-size
 #flash { position: fixed; inset: 0; z-index: 36; background: #fff; opacity: 0; pointer-events: none; }
 #flash.on { animation: flash .7s ease-out; }
 @keyframes flash { 0% { opacity: .95; } 100% { opacity: 0; } }
+/* 놀이 장소 창: 물 받기, 돌탑 쌓기, 동물사진관, 산꾸 꾸미기 */
+#game { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 33; width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 110px); overflow: auto; padding: 14px 16px 16px; display: grid; gap: 10px; border: 1px solid var(--ribbon); border-radius: 6px; background: var(--shade); box-shadow: 0 14px 40px rgba(0, 0, 0, .5); animation: meetIn .35s ease-out; }
+#game[hidden] { display: none; }
+#game h3, #game p { margin: 0; }
+.game-kind { color: var(--ribbon); font-size: 12px; }
+#game h3 { font-family: var(--display); font-weight: 800; font-size: 21px; line-height: 1.25; }
+#game-text { font-size: 13px; line-height: 1.55; }
+#game-note { min-height: 1.4em; font-size: 14px; font-weight: 600; color: #f5c542; font-variant-numeric: tabular-nums; }
+#game-stage { display: grid; justify-items: center; gap: 10px; }
+#game-stage:empty { display: none; }
+.game-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.game-actions button { flex: 1 1 120px; min-height: 46px; font-size: 15px; }
+.game-actions button:disabled { opacity: .45; }
+.gourd { width: min(180px, 48vw); height: auto; }
+.stack-view { width: min(300px, 100%); height: auto; border-radius: 4px; }
+.stone-picks, .leaf-picks { width: 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.stone-picks[hidden] { display: none; }
+.stone-pick, .leaf-pick { min-height: 0; padding: 6px 2px; display: grid; justify-items: center; gap: 2px; font-size: 12px; }
+.stone-pick canvas { width: 100%; height: auto; }
+.leaf-pick canvas { width: 40px; height: 40px; }
+.leaf-pick[aria-pressed="true"] { border-color: var(--ribbon); background: rgba(245, 181, 42, .2); }
+.leaf-preview { width: 160px; height: 160px; }
+.leaf-text { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 4px; background: rgba(0, 0, 0, .35); color: var(--carve); font: 500 16px var(--ui); }
+.leaf-text:focus-visible { outline: 2px solid var(--ribbon); outline-offset: 1px; }
+.studio-count { display: flex; gap: 18px; font-size: 16px; font-weight: 700; }
+body.panorama #game { visibility: hidden; }
+@media (min-width: 900px) and (min-height: 600px) { #game { bottom: calc(122px + env(safe-area-inset-bottom, 0px)); max-height: calc(100vh - 140px); } }
 #drink { position: fixed; inset: 0; z-index: 32; display: grid; place-items: center; background: rgba(12, 16, 14, .45); pointer-events: none; }
 #drink[hidden] { display: none; }
 #drink svg { width: min(460px, 88vw); filter: drop-shadow(0 8px 24px rgba(0, 0, 0, .45)); }
@@ -451,6 +481,14 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
   <p class="meet-gain" id="meet-gain" hidden></p>
   <button class="go" id="meet-go" type="button" hidden>계속 오르기</button>
 </aside>
+<section id="game" role="dialog" aria-labelledby="game-title" hidden>
+  <p class="game-kind">놀이 장소</p>
+  <h3 id="game-title"></h3>
+  <p id="game-text"></p>
+  <div id="game-stage"></div>
+  <p id="game-note" aria-live="polite"></p>
+  <div class="game-actions" id="game-actions"></div>
+</section>
 <button class="walk" id="rest-end" type="button" hidden>휴식 종료</button>
 <div id="rest-fx" aria-hidden="true" hidden><i>+</i><i>+</i><i>+</i><b id="rest-gain">체력 +1</b></div>
 <div id="flash" aria-hidden="true"></div>
@@ -563,7 +601,10 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
         <i aria-hidden="true">등산 시작</i>
       </button>
       <button class="go trial-go" id="trial" type="button">짧은 등산 체험해보기<small>한라산을 10분 코스로 줄였습니다</small></button>
-      <button class="tool" id="book-intro" type="button">도감 보기</button>
+      <div class="intro-tools">
+        <button class="tool" id="book-intro" type="button">도감 보기</button>
+        <button class="tool" id="hd-toggle" type="button" aria-pressed="true" title="가까운 나무, 풀, 꽃, 바위, 길, 구조물을 3배 자세하게 그립니다. 화면이 끊기면 끄세요">고화질 켜짐</button>
+      </div>
     </div>
     <p class="keys" id="keys">WASD·방향키로 걷기, 바닥 클릭으로 그 지점까지 걷기, 오른쪽 버튼을 누른 채 움직여 시점 바꾸기, 스페이스로 자동 등산, P로 파노라마, B로 도감.</p>
     <p class="credit">등산로와 노면 자료: 한국등산트레킹지원센터, <a href="https://www.data.go.kr/data/15098177/fileData.do">공공데이터포털</a>, 한국관광공사 TourAPI 사용</p>
@@ -608,6 +649,7 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
       <button role="tab" type="button" data-tab="flowers" aria-controls="book-body">꽃 도감 <small></small></button>
       <button role="tab" type="button" data-tab="stones" aria-controls="book-body">정상 비석 <small></small></button>
       <button role="tab" type="button" data-tab="myths" aria-controls="book-body">신비한동물사전 <small></small></button>
+      <button role="tab" type="button" data-tab="studio" aria-controls="book-body">동물 사진 <small></small></button>
     </div>
     <div class="book-body" id="book-body" role="tabpanel" tabindex="0"></div>
   </div>
@@ -662,6 +704,16 @@ const GPU_NAME = (() => {
 })();
 const MID = LOW || /Intel|UHD|Iris|Mali|Adreno|PowerVR|Vega \d|Radeon\(TM\) Graphics/i.test(GPU_NAME);
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// 고화질: 등산객 가까이 그리는 나무·풀·꽃·바위·길·구조물의 면을 약 3배로 늘린다
+const HD = (() => { try { const saved = localStorage.getItem('oreumgil-hd'); return saved ? saved === '1' : !LOW; } catch { return !LOW; } })();
+const PLAIN_DETAIL = { sides: 1, rings: 1, grid: 1, cards: 1, rock: 1 };
+let meshDetail = HD ? { sides: 1.5, rings: 2, grid: 1.75, cards: 1.5, rock: 1.73 } : PLAIN_DETAIL;
+// 먼 나무처럼 일부러 거칠게 만드는 모형은 고화질과 상관없이 예전 그대로 만든다
+function coarse(build) {
+  const keep = meshDetail;
+  meshDetail = PLAIN_DETAIL;
+  try { return build(); } finally { meshDetail = keep; }
+}
 
 /* ---------- 규칙: 체력이 많을수록 빠르고, 걸은 거리와 경사만큼 체력이 줄어든다 ---------- */
 const RULES = {
@@ -2055,6 +2107,18 @@ function randomUnit(rand) {
   return V(Math.cos(a) * r, y, Math.sin(a) * r);
 }
 function tube(out, path, radii, sides, color, base = color, vRepeat = .5) {
+  if (meshDetail.rings > 1 && path.length > 2) {
+    const curve = new THREE.CatmullRomCurve3(path), k = Math.round(meshDetail.rings), fine = [], wide = [];
+    for (let i = 0; i < path.length - 1; i++) for (let f = 0; f < k; f++) {
+      fine.push(f ? curve.getPoint((i + f / k) / (path.length - 1)) : path[i]);
+      wide.push(lerp(radii[i], radii[i + 1], f / k));
+    }
+    fine.push(path[path.length - 1]);
+    wide.push(radii[path.length - 1]);
+    path = fine;
+    radii = wide;
+    sides = Math.max(3, Math.round(sides * meshDetail.sides));
+  } else sides = Math.max(3, Math.round(sides * meshDetail.sides * (meshDetail.rings > 1 ? 1.34 : 1)));
   const t = V(0, 0, 0), a = V(0, 0, 0), b = V(0, 0, 0), n = V(0, 0, 0), mixed = new THREE.Color();
   let along = 0;
   const rings = path.map((p, i) => {
@@ -2104,7 +2168,7 @@ function cluster(out, c, radius, count, size, tree, color, rand, flat = 0) {
 function broadleaf({ trunkH, trunkR, limbs, reach, rise, perLimb, clusterR, cards, size, color, barkColor, seed, quality, roots = 4, moss = '#5d6e3c' }) {
   const rand = mulberry(seed), wood = newMesh(), leaves = newMesh();
   const full = quality >= 1, leaf = CC(color), brown = CC(barkColor), base = brown.clone().lerp(CC(moss), .45);
-  const count = Math.max(2, Math.round(cards * quality)), width = full ? size : size * 1.7;
+  const count = Math.max(2, Math.round(cards * quality * meshDetail.cards)), width = (full ? size : size * 1.7) * (meshDetail.cards > 1 ? .9 : 1);
   const wobble = () => (rand() - .5) * trunkH * .08;
   const flare = V(0, trunkH * .1, 0);
   const trunk = [V(0, 0, 0), flare, V(wobble(), trunkH * .55, wobble()), V(wobble(), trunkH, wobble())];
@@ -2142,7 +2206,7 @@ function pineTree(quality) {
   const full = quality >= 1, brown = CC('#c98d62'), low = CC('#6f5a48'), leaf = CC('#4f8048');
   const path = [V(0, 0, 0), V(.06, .5, 0), V(.12, 2.4, .04), V(.38, 4.8, -.06), V(.3, 7, .1), V(.12, 9, .05)];
   tube(wood, full ? path : [path[0], path[3], path[5]], full ? [.42, .32, .25, .19, .12, .05] : [.32, .19, .05], full ? 9 : 5, brown, low);
-  const pads = full ? 13 : 8;
+  const pads = full ? Math.round(13 * meshDetail.cards) : 8;
   const tree = { center: V(.3, 6.8, 0), radius: 4.2, low: 3.6, high: 10.2 };
   for (let i = 0; i < pads; i++) {
     const t = i / (pads - 1), y = lerp(4.3, 9.2, t), a = i * 2.4 + rand(), span = lerp(3, .9, t) * (.85 + rand() * .3);
@@ -2151,7 +2215,7 @@ function pineTree(quality) {
     const tip = root.clone().add(V(Math.cos(a) * span, .55 + rand() * .4, Math.sin(a) * span));
     tube(wood, full ? [root, bend, tip] : [root, tip], full ? [.12, .07, .02] : [.1, .02], full ? 4 : 3, brown);
     if (full) tube(wood, [bend, bend.clone().add(V(Math.cos(a + 1.1) * span * .4, .25, Math.sin(a + 1.1) * span * .4))], [.05, .01], 3, brown);
-    cluster(leaves, tip, lerp(1.05, .7, t), full ? 10 : 3, full ? .68 : 1.3, tree, leaf, rand, .74);
+    cluster(leaves, tip, lerp(1.05, .7, t), full ? Math.round(10 * Math.sqrt(meshDetail.cards)) : 3, full ? .68 : 1.3, tree, leaf, rand, .74);
   }
   return { wood: toGeometry(wood), leaf: toGeometry(leaves) };
 }
@@ -2159,7 +2223,7 @@ function conifer({ height, whorls, per, spread, droop, color, barkColor, seed, q
   const rand = mulberry(seed), wood = newMesh(), leaves = newMesh();
   const full = quality >= 1, brown = CC(barkColor), leaf = CC(color);
   tube(wood, [V(0, 0, 0), V(0, height * .08, 0), V(0, height * .5, 0), V(0, height, 0)], [trunkR * 1.25, trunkR, trunkR * .55, .02], full ? 8 : 4, brown, brown.clone().multiplyScalar(.7));
-  const rings = full ? whorls : Math.ceil(whorls / 2), arms = full ? per : Math.max(3, Math.ceil(per * .6));
+  const rings = full ? Math.round(whorls * Math.sqrt(meshDetail.cards)) : Math.ceil(whorls / 2), arms = full ? Math.round(per * Math.sqrt(meshDetail.cards)) : Math.max(3, Math.ceil(per * .6));
   for (let w = 0; w < rings; w++) {
     const t = w / (rings - 1), y = lerp(height * .16, height - .3, t), len = lerp(spread, spread * .18, t) * (.9 + rand() * .2);
     const half = len * (full ? width : width * 1.7), tone = lerp(.6, 1.16, t);
@@ -2203,6 +2267,10 @@ const CANOPY = { oak: .9, hornbeam: .7, chestnut: .9, cherry: .7, maple: .8, bir
 
 /* ---------- 풀, 작은 식물 ---------- */
 function grid(m, rows, cols, at, up = .5) {
+  if (meshDetail.grid > 1) {
+    if (cols === 1) rows = Math.round(rows * meshDetail.grid * meshDetail.grid);
+    else { rows = Math.round(rows * meshDetail.grid); cols = Math.round(cols * meshDetail.grid); }
+  }
   const pts = [];
   for (let i = 0; i <= rows; i++) for (let j = 0; j <= cols; j++) pts.push(at(i / rows, j / cols));
   const put = (a, b, c) => {
@@ -2338,7 +2406,7 @@ function shrub(color, seed, leafy = true) {
 
 /* ---------- 바위: 평면으로 깎아 모난 형태를 만든다 ---------- */
 function rockShape({ sx, sy, sz, cuts, seed, detail = 3 }) {
-  const rand = mulberry(seed), g = new THREE.IcosahedronGeometry(1, detail), pos = g.attributes.position;
+  const rand = mulberry(seed), g = new THREE.IcosahedronGeometry(1, Math.max(detail, Math.round((detail + 1) * meshDetail.rock) - 1)), pos = g.attributes.position;
   const planes = Array.from({ length: cuts }, () => ({ n: randomUnit(rand), d: .55 + rand() * .36 }));
   const p = V(0, 0, 0);
   for (let i = 0; i < pos.count; i++) {
@@ -3141,8 +3209,9 @@ function plantKinds() {
   for (const [name, spec] of Object.entries(TREES)) {
     // 먼 나무는 그림자 범위 밖이라 그림자 계산에서 뺀다
     const parts = (model, cast) => [{ geo: model.wood, mat: barks[spec.bark], cast }, { geo: model.leaf, mat: sheets[spec.leaf].mat, depth: cast ? sheets[spec.leaf].depth : null, cast }];
-    const high = parts(spec.build(1), true), low = parts(spec.build(.26), false);
+    const high = parts(HD ? coarse(() => spec.build(1)) : spec.build(1), true), low = parts(coarse(() => spec.build(.26)), false);
     out[name] = { parts: high, layer: 'high' };
+    if (HD) out[`${name}Hd`] = { parts: parts(spec.build(1), true), layer: 'hd' };
     out[`${name}Low`] = { parts: low, layer: 'low' };
     out[`${name}Far`] = { parts: low, layer: 'group' };
   }
@@ -3166,7 +3235,7 @@ function plantKinds() {
   const frondMat = swayMaterial(.09, { side: THREE.DoubleSide }, true);
   const flowerMat = swayMaterial(.14, { side: THREE.DoubleSide }, true);
   const fine = (geo, mat, cast = false) => ({ parts: [{ geo, mat, receive: true, cast }], layer: 'fine' });
-  Object.assign(out, {
+  const fineSet = () => ({
     grassThin: fine(grassClump({ blades: 11, height: .5, width: .022, lean: .3, low: '#3f6a2d', high: '#a6c862', seed: 61, segs: 3 }), bladeMat),
     grassBroad: fine(grassClump({ blades: 7, height: .62, width: .04, lean: .34, low: '#3a6a2f', high: '#8fbb55', rib: '#c2d98a', seed: 63, cols: 2, segs: 3 }), bladeMat),
     grassDry: fine(grassClump({ blades: 12, height: .7, width: .02, lean: .36, low: '#6f7d44', high: '#d2c68c', seed: 65, segs: 3 }), bladeMat),
@@ -3176,11 +3245,13 @@ function plantKinds() {
     butterbur: fine(butterbur(), frondMat),
     solomon: fine(solomonSeal(), frondMat),
     bamboo: fine(bamboo(), bladeMat),
-    ribbon: { parts: [{ geo: ribbon(), mat: swayMaterial(.5, { side: THREE.DoubleSide }) }], layer: 'small' },
   });
+  Object.assign(out, HD ? coarse(fineSet) : fineSet(), { ribbon: { parts: [{ geo: ribbon(), mat: swayMaterial(.5, { side: THREE.DoubleSide }) }], layer: 'small' } });
+  if (HD) for (const [name, spec] of Object.entries(fineSet())) out[`${name}Hd`] = { ...spec, layer: 'fineHd' };
   for (const flower of FLORA) {
-    const rand = mulberry(flower.id.length * 977 + flower.id.charCodeAt(1) * 31);
-    out[`flora_${flower.id}`] = { parts: [{ geo: FLOWER_BUILD[flower.id](rand), mat: flowerMat, receive: true }], layer: 'fine' };
+    const build = () => FLOWER_BUILD[flower.id](mulberry(flower.id.length * 977 + flower.id.charCodeAt(1) * 31));
+    out[`flora_${flower.id}`] = { parts: [{ geo: HD ? coarse(build) : build(), mat: flowerMat, receive: true }], layer: 'fine' };
+    if (HD) out[`flora_${flower.id}Hd`] = { parts: [{ geo: build(), mat: flowerMat, receive: true }], layer: 'fineHd' };
   }
 
   // 바위
@@ -3222,7 +3293,7 @@ function plantKinds() {
     return snowMats.get(key);
   };
   for (const [name, spec] of Object.entries({ ...out })) {
-    const base = name.replace(/(Low|Far)$/, '');
+    const base = name.replace(/(Low|Far|Hd)$/, '');
     if (TREES[base] || base.startsWith('young')) {
       const wood = spec.parts[0];
       out[winterName(name, 'Bare')] = { parts: [wood], layer: spec.layer };
@@ -3270,13 +3341,14 @@ function splatAt(x, z, out) {
 
 /* ---------- 타일: 등산객 주변만 만들고, 멀어지면 지운다. 코스 길이와 상관없이 부담이 일정하다 ---------- */
 const TILE = 100;
-const TILE_RES = LOW ? 34 : 50;
-const MASK_SIZE = 200;
+const TILE_RES = LOW ? 34 : HD ? 87 : 50;
+const MASK_SIZE = HD ? 340 : 200;
 const ACTIVE_RADIUS = LOW ? 210 : 270;
 const KEEP_RADIUS = ACTIVE_RADIUS + 90;
 const PLANT_RANGE = LOW ? 130 : 170;
 const HIGH_RANGE = LOW ? 80 : 105;      // 이 안의 타일만 가지와 잎이 자세한 나무를 쓴다
 const FINE_RANGE = LOW ? 80 : 115;      // 이 안의 타일에만 풀과 꽃을 그린다
+const HD_RANGE = 75;                    // 고화질일 때 이 안의 타일(등산객이 선 타일과 바로 곁)은 3배 자세한 나무를 쓴다
 const TREE_SPACING = LOW ? 5.4 : 3.7;   // 숲의 나무 간격(m)
 const NEAR_BAND = 42;                   // 등산로에서 이 거리까지는 빽빽하게 심는다
 const SLICE_MS = LOW ? 5 : 7;
@@ -3343,8 +3415,15 @@ function drawMask(tile) {
 const dummy = new THREE.Object3D(), tintColor = new THREE.Color();
 function addPlants(tile, lists) {
   for (const [name, list] of Object.entries(lists)) {
-    const spec = kinds[name];
-    const parent = tile[spec.layer ?? (spec.small ? 'small' : 'group')];
+    const spec = kinds[name], near = kinds[`${name}Hd`];
+    plantMeshes(tile, spec, list, tile[spec.layer ?? (spec.small ? 'small' : 'group')]);
+    // 고화질: 가까운 타일에서만 보이는 3배 자세한 나무를 같은 자리에 하나 더 둔다
+    if (near) plantMeshes(tile, near, list, tile[near.layer]);
+    tile.instances += list.length;
+  }
+}
+function plantMeshes(tile, spec, list, parent) {
+  {
     for (const part of spec.parts ?? [spec]) {
       const mesh = new THREE.InstancedMesh(part.geo, part.mat, list.length);
       list.forEach((item, i) => {
@@ -3367,7 +3446,6 @@ function addPlants(tile, lists) {
       parent.add(mesh);
       tile.plants.push(mesh);
     }
-    tile.instances += list.length;
   }
 }
 
@@ -3582,7 +3660,7 @@ const EVERGREEN = new Set(['pine', 'koreanPine', 'fir', 'yew', 'gusang', 'youngF
 const GROUND_COVER = new Set(['grassThin', 'grassBroad', 'grassDry', 'silver', 'sedge', 'fern', 'butterbur', 'solomon', 'bamboo', 'bush', 'clover']);
 const SNOW_CAPPED = new Set(['rockA', 'rockB', 'rockC', 'pebble']);
 const SNOW_PATH = new Set(['stepLog', 'stepStone', 'plank', 'post']);
-const winterName = (kind, variant) => kind.replace(/(Low|Far)?$/, end => variant + end);
+const winterName = (kind, variant) => kind.replace(/(Low|Far|Hd)?$/, end => variant + end);
 const winterRoll = item => hash3(Math.round(item.x * 10), Math.round(item.z * 10), 17);
 function winterize(tile, lists) {
   const out = {}, add = (kind, item) => (out[kind] ||= []).push(item);
@@ -3656,10 +3734,10 @@ function* buildTile(tile) {
 
 function loadTile(ix, iz) {
   const tile = {
-    ix, iz, ox: ix * TILE, oz: iz * TILE, group: new THREE.Group(), small: new THREE.Group(), fine: new THREE.Group(), high: new THREE.Group(), low: new THREE.Group(),
+    ix, iz, ox: ix * TILE, oz: iz * TILE, group: new THREE.Group(), small: new THREE.Group(), fine: new THREE.Group(), high: new THREE.Group(), low: new THREE.Group(), hd: new THREE.Group(), fineHd: new THREE.Group(),
     plants: [], owned: [], samples: [], colliders: [], flowers: [], mask: null, instances: 0, ready: false, dead: false, job: null,
   };
-  tile.group.add(tile.small, tile.fine, tile.high, tile.low);
+  tile.group.add(tile.small, tile.fine, tile.high, tile.low, tile.hd, tile.fineHd);
   tiles.set(`${ix},${iz}`, tile);
   jobs.push(tile);
 }
@@ -3684,10 +3762,13 @@ function updateTiles() {
   for (const tile of tiles.values()) {
     const d = away(tile);
     tile.small.visible = d < PLANT_RANGE;
-    tile.fine.visible = d < FINE_RANGE;
-    if (tile.high.visible !== d < HIGH_RANGE && nearShadow(tile)) shadowDirty = true;
-    tile.high.visible = d < HIGH_RANGE;
-    tile.low.visible = !tile.high.visible;
+    const near = HD && d < HD_RANGE, high = d < HIGH_RANGE && !near;
+    tile.fine.visible = d < FINE_RANGE && !near;
+    tile.fineHd.visible = near;
+    if ((tile.high.visible !== high || tile.hd.visible !== near) && nearShadow(tile)) shadowDirty = true;
+    tile.hd.visible = near;
+    tile.high.visible = high;
+    tile.low.visible = !high && !near;
   }
 }
 function pumpJobs(budget) {
@@ -4569,7 +4650,7 @@ function addStreamMeshes(streams) {
   scene.add(water);
   backdrop.push(water);
 }
-const SITE_ROOM = { temple: [12.5, 7.6], cabin: [8.5, 5.4], pavilion: [6.6, 3.6], rest: [4.4, 2.5], deck: [5.2, 0], rock: [7, 0], cave: [8.6, 0], pagoda: [6, 2.6], stupa: [4.8, 1.9], stele: [4.6, 1.9], statue: [6, 2.8], spring: [4, 1.9], peak: [3.4, 1.5], pass: [3.9, 1.7], cairn: [4.2, 1.9], tree: [7.2, 0], wall: [3.3, 0], gate: [0, 0], sangu: [3.4, 0] };
+const SITE_ROOM = { temple: [12.5, 7.6], cabin: [8.5, 5.4], pavilion: [6.6, 3.6], rest: [4.4, 2.5], deck: [5.2, 0], rock: [7, 0], cave: [8.6, 0], pagoda: [6, 2.6], stupa: [4.8, 1.9], stele: [4.6, 1.9], statue: [6, 2.8], spring: [4, 1.9], peak: [3.4, 1.5], pass: [3.9, 1.7], cairn: [4.2, 1.9], tree: [7.2, 0], wall: [3.3, 0], gate: [0, 0], sangu: [3.4, 0], gourdGame: [4, 1.9], stackGame: [4.2, 1.9], photoStudio: [4.4, 2.4], leafGame: [3.4, 0] };
 function readySites() {
   edits.clear();
   const t = trail, end = t.length - 40, ranges = [], falls = [], pools = [];
@@ -4658,23 +4739,23 @@ function readySites() {
     const sides = [place(1), place(-1)].filter(o => !nearest(o.x, o.z, room - 1.6) && Math.hypot(o.x - stoneSpot.x, o.z - stoneSpot.z) > room + 7 && !summitSpot?.clear?.(o.x, o.z) && !siteBlocked(o.x, o.z));
     if (!sides.length) return false;
     // 전망대는 낮은 쪽, 산꾸는 비탈을 등진 높은 쪽, 나머지는 길과 높이가 비슷한 쪽에 둔다
-    const score = o => (stream && o.side === stream.side ? 99 : 0) + (kind === 'deck' ? groundHeight(o.x, o.z) - y : kind === 'sangu' ? y - groundHeight(o.x, o.z) : Math.abs(groundHeight(o.x, o.z) - y));
+    const score = o => (stream && o.side === stream.side ? 99 : 0) + (kind === 'deck' ? groundHeight(o.x, o.z) - y : kind === 'sangu' || kind === 'leafGame' ? y - groundHeight(o.x, o.z) : Math.abs(groundHeight(o.x, o.z) - y));
     sides.sort((a, b) => score(a) - score(b));
     const { x, z, side } = sides[0], site = { kind, s, label, x, z, y: y - .03, side, yaw: Math.atan2(p.x - x, p.z - z), made };
     if (flat) {
       const pad = { x, z, y: site.y, flat, out: flat + 6.5, clear: flat + 1.5 };
       markEdit(x, z, pad.out, pad);
       site.pad = true;
-    } else if (kind !== 'deck') markEdit(x, z, room, { x, z, y, flat: 0, out: 0, clear: kind === 'tree' ? 4 : kind === 'sangu' ? 2.6 : 3.4 });
+    } else if (kind !== 'deck') markEdit(x, z, room, { x, z, y, flat: 0, out: 0, clear: kind === 'tree' ? 4 : kind === 'sangu' || kind === 'leafGame' ? 2.6 : 3.4 });
     t.sites.push(site);
     return true;
   };
   for (const poi of t.pois) {
     seat(siteKind(poi), poi.s, poi.label);
   }
-  // 약수터, 쉼터, 정자, 돌탑, 산꾸가 코스 길이에 맞게 고루 있도록 더한다
+  // 약수터, 쉼터, 정자, 돌탑, 산꾸와 놀이 장소 네 곳이 코스 길이에 맞게 고루 있도록 더한다
   const rand = mulberry(course.seed + 977);
-  for (const [kind, every, name] of [['spring', 3000, '약수터'], ['rest', 2500, '쉼터'], ['pavilion', 4000, '정자'], ['cairn', 3000, '돌탑'], ['sangu', 3000, '산꾸']]) {
+  for (const [kind, every, name] of [['spring', 3000, '약수터'], ['rest', 2500, '쉼터'], ['pavilion', 4000, '정자'], ['cairn', 3000, '돌탑'], ['sangu', 3000, '산꾸'], ['gourdGame', 4000, '물 받기 약수터'], ['stackGame', 4000, '돌탑 쌓기'], ['photoStudio', 4000, '동물사진관'], ['leafGame', 4000, '산꾸 꾸미기']]) {
     const want = Math.max(1, Math.round(t.length / every)) - t.sites.filter(o => o.kind === kind).length;
     for (let k = 0, tries = 0; k < want && tries < want * 10 + 6; tries++) {
       const s = lerp(110, end - 20, clamp((k + .5) / want + (rand() - .5) * (tries < want ? .3 : 1), 0, 1));
@@ -4686,7 +4767,7 @@ function readySites() {
 /* ---------- 장소 모형 ---------- */
 const siteBoxes = new Map();
 const boxOf2 = (w, h, d) => { const key = `${w}|${h}|${d}`; if (!siteBoxes.has(key)) siteBoxes.set(key, new THREE.BoxGeometry(w, h, d)); return siteBoxes.get(key); };
-const rodOf = (a, b, h, sides = 10) => { const key = `r${a}|${b}|${h}|${sides}`; if (!siteBoxes.has(key)) siteBoxes.set(key, new THREE.CylinderGeometry(a, b, h, sides)); return siteBoxes.get(key); };
+const rodOf = (a, b, h, sides = 10) => { sides = Math.round(sides * (HD ? 1.8 : 1)); const key = `r${a}|${b}|${h}|${sides}`; if (!siteBoxes.has(key)) siteBoxes.set(key, new THREE.CylinderGeometry(a, b, h, sides)); return siteBoxes.get(key); };
 function roofGeometry(w, d, h, lift) {
   const key = `roof${w}|${d}|${h}|${lift}`;
   if (siteBoxes.has(key)) return siteBoxes.get(key);
@@ -5178,13 +5259,625 @@ const DRINK_SECONDS = 4.6, REST_TICK = 10, SPRING_GAIN = 5;
 const amen = { visits: new Set(), hinted: new Set(), hold: false, act: null, site: null, approach: null, rootY: 0, yaw: 0, clock: 0, flowers: 0, energy: 0, resume: false, photo: null };
 const STAR = '<svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.4l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.2l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>';
 
+/* ---------- 놀이 장소: 길에서 우연히 만나는 네 가지 놀이. 자동 등산 중에는 반드시 멈춘다 ---------- */
+const GAMES = {
+  gourdGame: { title: '물 받기 약수터', text: '조롱박에 그어진 선까지 약수를 받아 보세요. 시작을 누르면 물이 차오르고 멈춤을 누르면 멈춥니다. 선에서 위아래 5% 안에 멈추면 성공입니다.', reward: '성공하면 기운 +1' },
+  stackGame: { title: '돌탑 쌓기', text: '모양이 다른 돌 다섯 개 가운데 하나를 골라 돌탑 위에 얹어 보세요. 떨어지지 않으면 성공입니다.', reward: '성공하면 기운 +1' },
+  photoStudio: { title: '동물사진관', text: '기운 1을 도토리 5개로 바꿔 나무 밥그릇에 넣으면, 숲속 동물이 찾아와 먹고 함께 사진을 찍어 줍니다. 신비한 동물이 올 때도 있어요.', reward: '찍은 사진은 도감의 동물 사진에 담깁니다' },
+  leafGame: { title: '산꾸 꾸미기', text: '돌담 빈자리에 나뭇잎 한 장을 골라 붙이고, 20자 안으로 남기고 싶은 말을 써 보세요. 글은 손글씨로 나뭇잎에 적힙니다.', reward: '붙인 나뭇잎은 다음에 와도 남아 있어요' },
+};
+const game = { site: null, raf: 0, studio: null };
+function openGame(site) {
+  const spec = GAMES[site.kind];
+  game.site = site;
+  walkTo(null);
+  keys.clear();
+  Object.assign(amen, { hold: true, rootY: player.y, yaw: Math.atan2(site.x - player.x, site.z - player.z) });
+  $('game-title').textContent = spec.title;
+  $('game-text').textContent = spec.text;
+  $('game-note').textContent = spec.reward;
+  $('game-stage').replaceChildren();
+  gameButtons([['해보기', () => ({ gourdGame: playGourd, stackGame: playStack, photoStudio: playStudio, leafGame: playLeaf })[site.kind](site), true], ['지나가기', closeGame]]);
+  $('game').hidden = false;
+  $('game-actions').querySelector('button')?.focus({ preventScroll: true });
+}
+function gameButtons(list) {
+  $('game-actions').replaceChildren(...list.map(([label, act, main, off]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = main ? 'go' : 'tool';
+    b.textContent = label;
+    b.disabled = !!off;
+    b.addEventListener('click', act);
+    return b;
+  }));
+}
+function closeGame() {
+  cancelAnimationFrame(game.raf);
+  $('game').hidden = true;
+  if (game.studio) return;   // 사진관 장면이 이어지는 동안에는 그 자리에 둔다
+  amen.hold = false;
+  player.act = null;
+  game.site = null;
+  resumeAuto();
+}
+
+// 1. 물 받기: 조롱박 그림에 물이 차오르고, 붉은 표시선 가까이에서 멈춰야 한다
+const GOURD = 'M100 34C80 34 72 52 74 70C76 88 88 96 86 108C84 120 46 128 40 172C34 218 66 248 100 248C134 248 166 218 160 172C154 128 116 120 114 108C112 96 124 88 126 70C128 52 120 34 100 34Z';
+function playGourd(site) {
+  const target = Math.round(45 + Math.random() * 40), low = 244, high = 40, line = low - (low - high) * target / 100;
+  $('game-stage').innerHTML = `<svg class="gourd" viewBox="0 0 200 262" role="img" aria-label="조롱박에 물 받기. 표시선 ${target}%">
+    <defs><clipPath id="gourd-in"><path d="${GOURD}"/></clipPath></defs>
+    <rect x="93" y="10" width="14" height="28" rx="5" fill="#7a5a2a"/>
+    <path d="${GOURD}" fill="#f3e2b0"/>
+    <g clip-path="url(#gourd-in)"><rect id="gourd-water" x="0" y="${low}" width="200" height="0" fill="#5fb3d6"/><rect id="gourd-foam" x="0" y="${low}" width="200" height="4" fill="#dff3fb"/></g>
+    <line x1="34" x2="166" y1="${line}" y2="${line}" stroke="#d8452e" stroke-width="3" stroke-dasharray="9 6"/>
+    <text x="170" y="${line + 5}" fill="#f6e8bd" font-size="15" font-weight="700">${target}%</text>
+    <path d="${GOURD}" fill="none" stroke="#7a5a2a" stroke-width="5"/>
+    <path d="M64 150C58 178 64 206 80 222" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="6" stroke-linecap="round"/>
+  </svg>`;
+  let level = 0, last = 0;
+  const water = $('gourd-water'), foam = $('gourd-foam');
+  const draw = () => {
+    const y = low - (low - high) * level / 100;
+    water.setAttribute('y', y);
+    water.setAttribute('height', low - y + 12);
+    foam.setAttribute('y', y - 1);
+    $('game-note').textContent = `물 ${level.toFixed(0)}% · 표시선 ${target}%`;
+  };
+  const tick = now => {
+    const dt = Math.min(.05, (now - last) / 1000);
+    last = now;
+    // 차오를수록 조금씩 빨라진다
+    level = Math.min(100, level + dt * (24 + level * .22));
+    draw();
+    if (level >= 100) { stop(); return; }
+    game.raf = requestAnimationFrame(tick);
+  };
+  const stop = () => {
+    cancelAnimationFrame(game.raf);
+    const gap = Math.abs(level - target), ok = gap <= 5, first = ok && !site.won;
+    if (first) { site.won = true; gainEnergy(1); }
+    $('game-note').textContent = ok ? `성공! 표시선과 ${gap.toFixed(1)}% 차이예요.${first ? ' 기운 +1' : ''}` : level >= 100 ? '물이 넘쳤어요. 다시 해 볼까요?' : `아쉬워요. 표시선과 ${gap.toFixed(1)}% 차이가 났어요.`;
+    gameButtons([['다시 하기', start, !ok], ['그만하기', closeGame, ok]]);
+  };
+  const start = () => {
+    level = 0;
+    last = performance.now();
+    draw();
+    cancelAnimationFrame(game.raf);
+    game.raf = requestAnimationFrame(tick);
+    gameButtons([['멈춤', stop, true]]);
+  };
+  draw();
+  gameButtons([['시작', start, true], ['그만하기', closeGame]]);
+}
+
+// 2. 돌탑 쌓기: 고른 돌이 좌우로 움직이고, 놓기를 누르면 떨어진다. 가운데 가까이 얹혀야 버틴다
+const STONES = [
+  { name: '넓적돌', w: 96, h: 20, grip: 26, speed: 2.1, flat: true },
+  { name: '긴돌', w: 118, h: 17, grip: 22, speed: 2.4, flat: true },
+  { name: '쐐기돌', w: 74, h: 32, grip: 15, speed: 2.5, wedge: true },
+  { name: '둥근돌', w: 54, h: 46, grip: 9, speed: 2.9 },
+  { name: '작은돌', w: 40, h: 24, grip: 13, speed: 3.3 },
+];
+function drawStone(g, stone, x, y, angle = 0, tone = '#9a958a') {
+  g.save();
+  g.translate(x, y);
+  g.rotate(angle);
+  g.beginPath();
+  if (stone.wedge) { g.moveTo(-stone.w / 2, stone.h / 2); g.lineTo(stone.w / 2, stone.h / 2); g.lineTo(stone.w * .2, -stone.h / 2); g.lineTo(-stone.w * .32, -stone.h / 2 + 5); g.closePath(); }
+  else if (stone.flat) g.roundRect(-stone.w / 2, -stone.h / 2, stone.w, stone.h, stone.h * .45);
+  else g.ellipse(0, 0, stone.w / 2, stone.h / 2, 0, 0, Math.PI * 2);
+  const shade = g.createLinearGradient(0, -stone.h / 2, 0, stone.h / 2);
+  shade.addColorStop(0, tone);
+  shade.addColorStop(1, '#5d5950');
+  g.fillStyle = shade;
+  g.fill();
+  g.lineWidth = 2;
+  g.strokeStyle = 'rgba(30,26,20,.7)';
+  g.stroke();
+  g.beginPath();
+  g.moveTo(-stone.w * .24, -stone.h * .12);
+  g.quadraticCurveTo(0, -stone.h * .3, stone.w * .22, -stone.h * .16);
+  g.strokeStyle = 'rgba(255,255,255,.22)';
+  g.stroke();
+  g.restore();
+}
+function playStack(site) {
+  const view = document.createElement('canvas'), picks = document.createElement('div'), g = view.getContext('2d'), center = 160, top = 150;
+  view.width = 320;
+  view.height = 262;
+  view.className = 'stack-view';
+  picks.className = 'stone-picks';
+  const layers = [[0, 248, 150, 26], [0, 224, 132, 24], [2, 201, 114, 23], [-2, 180, 96, 21], [1, 161, 74, 19]];
+  let stone = null, phase = 'pick', t = 0, x = center, y = 44, vy = 0, tilt = 0, after = 0, last = 0;
+  const scene = () => {
+    const sky = g.createLinearGradient(0, 0, 0, view.height);
+    sky.addColorStop(0, '#9cc3dc');
+    sky.addColorStop(1, '#e9e3d2');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, view.width, view.height);
+    g.fillStyle = '#6f7d52';
+    g.fillRect(0, 252, view.width, 10);
+    // 사람 키의 80%쯤 쌓인 돌탑
+    layers.forEach(([dx, cy, w, h], i) => drawStone(g, { w, h, flat: i % 2 === 0 }, center + dx, cy, (i % 2 ? -.03 : .04), '#8d887c'));
+    if (stone) drawStone(g, stone, x, y, tilt);
+    if (phase === 'swing') { g.strokeStyle = 'rgba(255,255,255,.5)'; g.setLineDash([4, 6]); g.beginPath(); g.moveTo(x, y + stone.h / 2 + 4); g.lineTo(x, top - 4); g.stroke(); g.setLineDash([]); }
+  };
+  const loop = now => {
+    const dt = Math.min(.05, (now - last) / 1000);
+    last = now;
+    t += dt;
+    if (phase === 'swing') x = center + Math.sin(t * stone.speed) * 72;
+    else if (phase === 'drop') {
+      vy += 1500 * dt;
+      y += vy * dt;
+      const rest = top - stone.h / 2;
+      if (y >= rest) {
+        y = rest;
+        const offset = x - center;
+        if (Math.abs(offset) <= stone.grip) { phase = 'stay'; settle(true); }
+        else { phase = 'tip'; tilt = 0; vy = 0; }
+      }
+    } else if (phase === 'tip') {
+      // 가운데에서 먼 쪽으로 기울며 미끄러져 떨어진다
+      const side = Math.sign(x - center);
+      tilt += side * dt * 3.2;
+      x += side * dt * 95;
+      if (Math.abs(tilt) > .5) { vy += 1500 * dt; y += vy * dt; }
+      after += dt;
+      if (after > .9) { phase = 'fell'; settle(false); }
+    }
+    scene();
+    if (phase === 'swing' || phase === 'drop' || phase === 'tip') game.raf = requestAnimationFrame(loop);
+  };
+  const choose = picked => {
+    stone = picked;
+    phase = 'swing';
+    t = Math.random() * 6;
+    y = 44;
+    vy = 0;
+    tilt = 0;
+    after = 0;
+    picks.hidden = true;
+    $('game-note').textContent = `${picked.name}: 좌우로 움직일 때 놓기를 눌러 돌탑 위에 얹으세요.`;
+    gameButtons([['놓기', () => { if (phase === 'swing') { phase = 'drop'; gameButtons([]); } }, true]]);
+    last = performance.now();
+    cancelAnimationFrame(game.raf);
+    game.raf = requestAnimationFrame(loop);
+  };
+  const settle = ok => {
+    const first = ok && !site.won;
+    if (first) { site.won = true; gainEnergy(1); }
+    if (ok) addCairnStone(site, stone);
+    $('game-note').textContent = ok ? `성공! ${stone.name}이 단단히 얹혔어요.${first ? ' 기운 +1' : ''}` : '돌이 미끄러져 떨어졌어요. 다른 돌로 해 볼까요?';
+    gameButtons([['다시 하기', reset, !ok], ['그만하기', closeGame, ok]]);
+  };
+  const reset = () => { stone = null; phase = 'pick'; picks.hidden = false; scene(); $('game-note').textContent = '얹을 돌을 고르세요.'; gameButtons([['그만하기', closeGame]]); };
+  STONES.forEach(item => {
+    const b = document.createElement('button'), icon = document.createElement('canvas');
+    b.type = 'button';
+    b.className = 'tool stone-pick';
+    icon.width = 128;
+    icon.height = 56;
+    drawStone(icon.getContext('2d'), item, 64, 28);
+    b.append(icon, document.createTextNode(item.name));
+    b.addEventListener('click', () => choose(item));
+    picks.append(b);
+  });
+  $('game-stage').replaceChildren(view, picks);
+  reset();
+}
+// 성공한 돌은 실제 돌탑 위에도 얹힌다
+// 그림의 돌 크기(픽셀)를 실제 돌 크기로: 넓적돌은 폭 32 cm, 두께 7 cm쯤
+const stoneThick = stone => stone.h / 288;
+function addCairnStone(site, stone) {
+  (site.added ??= []).push(stone);
+  if (!site.stoneGroup) return;
+  const k = site.added.length - 1, rock = new THREE.Mesh(cairnStone, summitRock);
+  rock.scale.set(stone.w / 600, stone.h / 300, stone.w / 700);
+  rock.position.set((hash3(k, 1, 5) - .5) * .05, site.added.slice(0, k).reduce((sum, o) => sum + stoneThick(o) * .85, 0) + stoneThick(stone) * .42, (hash3(k, 2, 5) - .5) * .05);
+  rock.rotation.y = hash3(k, 3, 5) * 6.283;
+  rock.castShadow = true;
+  site.stoneGroup.add(rock);
+}
+
+// 3. 동물사진관: 기운으로 도토리를 받고, 밥그릇에 넣으면 동물이 와서 먹고 함께 사진을 찍는다
+function spendEnergy(n) {
+  record.energy = Math.max(0, (record.energy ?? 0) - n);
+  saveBook();
+  $('energy-value').textContent = record.energy;
+}
+function playStudio(site) {
+  const draw = note => {
+    $('game-stage').innerHTML = `<p class="studio-count"><span>★ 기운 ${record.energy ?? 0}</span><span>도토리 ${record.acorns ?? 0}개</span></p>`;
+    if (note) $('game-note').textContent = note;
+    gameButtons([['기운 1 → 도토리 5개', trade, true, (record.energy ?? 0) < 1], ['도토리 5개 넣기', feed, true, (record.acorns ?? 0) < 5], ['그만하기', closeGame]]);
+  };
+  const trade = () => {
+    if ((record.energy ?? 0) < 1) return;
+    spendEnergy(1);
+    record.acorns = (record.acorns ?? 0) + 5;
+    saveBook();
+    draw('도토리 5개를 받았어요. 나무 밥그릇에 넣어 보세요.');
+  };
+  const feed = () => {
+    if ((record.acorns ?? 0) < 5) return;
+    record.acorns -= 5;
+    saveBook();
+    startStudio(site);
+  };
+  draw((record.energy ?? 0) < 1 && (record.acorns ?? 0) < 5 ? '기운이 모자라요. 돌탑, 산꾸, 신비한 동물을 만나면 기운이 오릅니다.' : '');
+}
+// 밥그릇 둘레의 자리: 등산객은 그릇 옆, 동물은 맞은편, 사진기는 길 쪽에 둔다
+function studioLayout(site, kind) {
+  const bowl = site.bowl ?? { x: site.x, y: groundHeight(site.x, site.z) + .55, z: site.z }, p = trailAt(site.s);
+  let wx = p.x - bowl.x, wz = p.z - bowl.z;
+  const wl = Math.hypot(wx, wz) || 1, reach = Math.max(.5, kind.length * .55 + .3);
+  wx /= wl;
+  wz /= wl;
+  const ax = -wz, az = wx;
+  return {
+    bowl, wx, wz,
+    stand: { x: bowl.x + ax * 1.05 + wx * .3, z: bowl.z + az * 1.05 + wz * .3 },
+    eat: { x: bowl.x - ax * reach, z: bowl.z - az * reach },
+    from: { x: bowl.x - ax * (reach + 6) - wx * 3, z: bowl.z - az * (reach + 6) - wz * 3 },
+  };
+}
+function startStudio(site) {
+  const kinds = [...ANIMALS, ...MYTHS.filter(k => !k.flies)], kind = kinds[Math.floor(Math.random() * kinds.length)], beast = pool.get(kind.id);
+  if (beast.active) { beast.retire(); const i = beasts.indexOf(beast); if (i >= 0) beasts.splice(i, 1); }
+  const spot = studioLayout(site, kind);
+  site.acornMeshes?.forEach(m => { m.visible = true; });
+  game.studio = { site, beast, kind, spot, phase: 'walk', clock: 0 };
+  $('game').hidden = true;
+  player.act = null;
+  amen.hold = false;
+  walkToPoint(spot.stand.x, spot.stand.z);
+  marker.visible = false;
+}
+function stepPhotoStudio(dt) {
+  const st = game.studio, { spot, beast } = st;
+  st.clock += dt;
+  if (st.phase === 'walk') {
+    // 밥그릇 옆으로 걸어가 서면 숲에서 동물이 나온다
+    const gap = Math.hypot(spot.stand.x - player.x, spot.stand.z - player.z);
+    if (gap > .45 && state.walkPoint && st.clock < 8) return;
+    walkTo(null);
+    Object.assign(amen, { hold: true, rootY: groundHeight(player.x, player.z) + .02, yaw: Math.atan2(spot.bowl.x - player.x, spot.bowl.z - player.z) });
+    beast.place({ x: spot.from.x, z: spot.from.z, aim: null, mode: 'graze', clock: 999, life: 999 });
+    beast.met = true;
+    beast.tame = { phase: 'come', clock: 0, x: spot.eat.x, z: spot.eat.z, face: Math.atan2(spot.bowl.x - spot.eat.x, spot.bowl.z - spot.eat.z) };
+    beasts.push(beast);
+    // 카메라는 길 쪽에서 밥그릇을 바라보게 돌려, 동물이 오는 모습과 먹는 모습이 보이게 한다
+    cam.face = Math.atan2(spot.wx, spot.wz);
+    cam.hold = 20;
+    Object.assign(st, { phase: 'wait', clock: 0 });
+    showToast(`${st.kind.name}${st.kind.myth ? '(신비한 동물)' : ''}이(가) 도토리 냄새를 맡고 다가와요`, 3200);
+  } else if (st.phase === 'wait') {
+    if (beast.tame.phase === 'eat') Object.assign(st, { phase: 'eat', clock: 0 });
+  } else if (st.phase === 'eat') {
+    // 도토리를 하나씩 먹는다
+    const left = Math.max(0, 5 - Math.floor(st.clock / .8));
+    st.site.acornMeshes?.forEach((m, i) => { m.visible = i < left; });
+    if (st.clock > 4.3) {
+      st.cam = studioCamera(st);
+      Object.assign(st, { phase: 'pose', clock: 0 });
+      Object.assign(beast.tame, { phase: 'pose', camX: st.cam.x, camZ: st.cam.z });
+      amen.yaw = Math.atan2(st.cam.x - player.x, st.cam.z - player.z);
+      player.act = { kind: 'cheer' };
+    }
+  } else if (st.phase === 'pose' && st.clock > 1.5) {
+    const url = takeStudioPhoto(st), id = `animal-${Date.now()}`;
+    saveSummitPhoto(id, url);
+    (record.studio ??= []).push({ id, animal: st.kind.id, name: st.kind.name, myth: !!st.kind.myth, course: course.label ?? course.name, at: today() });
+    if (st.kind.myth) noteMyth(st.kind);
+    saveBook();
+    const flash = $('flash');
+    flash.classList.remove('on');
+    void flash.offsetWidth;
+    flash.classList.add('on');
+    sound.shutter?.();
+    showToast(`${st.kind.name}와 찍은 사진을 도감의 동물 사진에 담았어요`, 3600);
+    Object.assign(st, { phase: 'bye', clock: 0 });
+  } else if (st.phase === 'bye' && st.clock > 1.6) {
+    // 사진을 찍고 나면 동물은 숲으로 돌아간다
+    beast.tame = null;
+    beast.life = beast.age + 1.2;
+    cam.hold = 0;
+    game.studio = null;
+    game.site = null;
+    amen.hold = false;
+    player.act = null;
+    resumeAuto();
+  }
+}
+// 등산객과 동물을 길 쪽에서 함께 담는다. 길 쪽은 트여 있어 나무에 가리지 않는다
+function studioCamera(st) {
+  const b = st.beast, { wx, wz } = st.spot, mx = (player.x + b.x) / 2, mz = (player.z + b.z) / 2, l = Math.hypot(b.x - player.x, b.z - player.z);
+  const far = (st.kind.big ? 3.2 : 2.4) + l * .75;
+  return { x: mx + wx * far, z: mz + wz * far, mx, mz, my: (player.y + b.y) / 2 };
+}
+function takeStudioPhoto(st) {
+  const ratio = renderer.getPixelRatio(), W = Math.min(720, canvas.width), H = Math.min(Math.round(W * .75), canvas.height), cam = st.cam;
+  snapCam.aspect = W / H;
+  snapCam.updateProjectionMatrix();
+  snapCam.position.set(cam.x, Math.max(cam.my + 1.35, groundHeight(cam.x, cam.z) + 1.2), cam.z);
+  snapCam.lookAt(cam.mx, cam.my + (st.kind.big ? .95 : .7), cam.mz);
+  snapCam.updateMatrixWorld();
+  marker.visible = false;
+  player.model.root.updateMatrixWorld(true);
+  st.beast.root.updateMatrixWorld(true);
+  renderer.shadowMap.needsUpdate = true;
+  renderer.setViewport(0, 0, W / ratio, H / ratio);
+  renderer.render(scene, snapCam);
+  const paper = document.createElement('canvas');
+  paper.width = W;
+  paper.height = H;
+  const g = paper.getContext('2d');
+  g.drawImage(canvas, 0, canvas.height - H, W, H, 0, 0, W, H);
+  renderer.setViewport(0, 0, viewW, viewH);
+  const band = Math.round(H * .13), fade = g.createLinearGradient(0, H - band * 1.6, 0, H);
+  fade.addColorStop(0, 'rgba(20, 15, 9, 0)');
+  fade.addColorStop(1, 'rgba(20, 15, 9, .72)');
+  g.fillStyle = fade;
+  g.fillRect(0, H - band * 1.6, W, band * 1.6);
+  g.fillStyle = '#f6e8bd';
+  g.font = `800 ${Math.round(band * .46)}px ${tok('--display')}`;
+  g.textAlign = 'left';
+  g.fillText(`${st.kind.name}와 함께`, band * .4, H - band * .42);
+  g.font = `500 ${Math.round(band * .28)}px ${tok('--ui')}`;
+  g.textAlign = 'right';
+  g.fillText(`${course.label ?? course.name} · ${today()}`, W - band * .4, H - band * .42);
+  return paper.toDataURL('image/jpeg', .82);
+}
+function studioShelf(body) {
+  const list = [...(record.studio ?? [])].reverse();
+  bookNote(body, list.length ? '동물사진관에서 도토리를 주고 함께 찍은 사진입니다.' : '아직 찍은 사진이 없습니다. 길에서 동물사진관을 만나면 도토리를 주고 동물과 함께 사진을 찍어 보세요.');
+  if (!list.length) return;
+  const grid = node('ul', 'book-grid stone-grid');
+  for (const shot of list) {
+    const item = node('li', 'stone-card'), img = node('img', 'stone-photo'), url = summitPhoto(shot.id);
+    img.alt = `${shot.name}와 함께 찍은 사진`;
+    if (url) img.src = url;
+    else fetchSummitPhoto(shot.id).then(found => { if (found) img.src = found; });
+    item.append(img, node('p', 'stone-meta', `${shot.name}${shot.myth ? ' · 신비한 동물' : ''}\n${shot.course} · ${shot.at}`));
+    grid.append(item);
+  }
+  body.append(grid);
+}
+
+// 4. 산꾸 꾸미기: 나뭇잎을 골라 글을 쓰고 돌담 빈자리에 붙인다
+const LEAVES = [
+  { name: '단풍잎', color: '#d8352a', vein: '#8e1c14', shape: 'maple' },
+  { name: '은행잎', color: '#f0bf2c', vein: '#a88212', shape: 'ginkgo' },
+  { name: '떡갈잎', color: '#d9832b', vein: '#8a4f17', shape: 'oak' },
+  { name: '자작잎', color: '#7fb23c', vein: '#4d7a1e', shape: 'oval' },
+  { name: '계수잎', color: '#c4558f', vein: '#7e2a58', shape: 'heart' },
+];
+function leafPath(g, shape, r) {
+  g.beginPath();
+  if (shape === 'maple') {
+    for (let i = 0; i <= 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5, k = i % 2 ? .42 : i === 0 || i === 10 ? 1 : i === 4 || i === 6 ? .72 : .9;
+      g.lineTo(Math.cos(a) * r * k, Math.sin(a) * r * k);
+    }
+  } else if (shape === 'ginkgo') {
+    g.moveTo(0, r * .55);
+    g.quadraticCurveTo(-r * .2, r * .1, -r, -r * .38);
+    g.quadraticCurveTo(-r * .55, -r * 1.02, -r * .08, -r * .78);
+    g.lineTo(0, -r * .52);
+    g.lineTo(r * .08, -r * .78);
+    g.quadraticCurveTo(r * .55, -r * 1.02, r, -r * .38);
+    g.quadraticCurveTo(r * .2, r * .1, 0, r * .55);
+  } else if (shape === 'oak') {
+    for (let i = 0; i <= 64; i++) {
+      const a = i / 64 * Math.PI * 2, k = (.78 + Math.abs(Math.sin(a * 3.5)) * .22) * (1 - .25 * Math.max(0, Math.sin(a)));
+      g.lineTo(Math.cos(a) * r * .62 * k, -Math.sin(a) * r * k);
+    }
+  } else if (shape === 'oval') {
+    for (let i = 0; i <= 72; i++) {
+      const a = i / 72 * Math.PI * 2, k = 1 + (i % 2 ? .035 : 0);
+      g.lineTo(Math.cos(a) * r * .62 * k, Math.sin(a) * r * .92 * k * (Math.sin(a) < 0 ? 1.05 : .95));
+    }
+  } else {
+    g.moveTo(0, r * .78);
+    g.bezierCurveTo(-r * 1.1, r * .1, -r * .8, -r * .9, 0, -r * .45);
+    g.bezierCurveTo(r * .8, -r * .9, r * 1.1, r * .1, 0, r * .78);
+  }
+  g.closePath();
+}
+function drawLeaf(g, leaf, text, size) {
+  g.clearRect(0, 0, size, size);
+  g.save();
+  g.translate(size / 2, size * .5);
+  leafPath(g, leaf.shape, size * .44);
+  const shade = g.createRadialGradient(-size * .1, -size * .12, size * .05, 0, 0, size * .5);
+  shade.addColorStop(0, '#ffffff33');
+  shade.addColorStop(1, '#00000022');
+  g.fillStyle = leaf.color;
+  g.fill();
+  g.fillStyle = shade;
+  g.fill();
+  g.lineWidth = size * .014;
+  g.strokeStyle = leaf.vein;
+  g.stroke();
+  // 잎맥과 꼭지
+  g.lineWidth = size * .01;
+  g.beginPath();
+  g.moveTo(0, size * .48);
+  g.lineTo(0, -size * .34);
+  for (const k of [-.2, 0, .2]) { g.moveTo(0, size * k); g.lineTo(-size * .2, size * (k - .12)); g.moveTo(0, size * k); g.lineTo(size * .2, size * (k - .12)); }
+  g.stroke();
+  g.restore();
+  if (!text) return;
+  // 손글씨: 10자씩 두 줄까지 나눠 잎 가운데에 쓴다
+  const chars = [...text], lines = chars.length > 10 ? [chars.slice(0, Math.ceil(chars.length / 2)).join(''), chars.slice(Math.ceil(chars.length / 2)).join('')] : [text];
+  const px = Math.round(size * (lines.length > 1 ? .12 : .15) * Math.min(1, 7 / Math.max(...lines.map(l => [...l].length))) + size * .03);
+  g.font = `${px}px "Nanum Pen Script", "Gaegu", cursive`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineWidth = Math.max(2, px * .16);
+  g.strokeStyle = 'rgba(40,20,10,.55)';
+  g.fillStyle = '#fffaf0';
+  lines.forEach((l, i) => {
+    const y = size * .5 + (i - (lines.length - 1) / 2) * px * 1.05;
+    g.strokeText(l, size / 2, y);
+    g.fillText(l, size / 2, y);
+  });
+}
+const leafKey = site => `${course.id}|${Math.round(site.s)}`;
+function playLeaf(site) {
+  let pick = LEAVES[0];
+  const preview = document.createElement('canvas'), picks = document.createElement('div'), input = document.createElement('input');
+  preview.width = preview.height = 220;
+  preview.className = 'leaf-preview';
+  picks.className = 'leaf-picks';
+  Object.assign(input, { type: 'text', maxLength: 20, placeholder: '남길 말 (20자 이내)', className: 'leaf-text' });
+  input.setAttribute('aria-label', '나뭇잎에 쓸 말');
+  const words = () => [...input.value].slice(0, 20).join('');
+  const refresh = () => {
+    for (const b of picks.children) b.setAttribute('aria-pressed', String(b.dataset.leaf === pick.name));
+    drawLeaf(preview.getContext('2d'), pick, words(), 220);
+  };
+  for (const leaf of LEAVES) {
+    const b = document.createElement('button'), icon = document.createElement('canvas');
+    b.type = 'button';
+    b.className = 'tool leaf-pick';
+    b.dataset.leaf = leaf.name;
+    icon.width = icon.height = 56;
+    drawLeaf(icon.getContext('2d'), leaf, '', 56);
+    b.append(icon, document.createTextNode(leaf.name));
+    b.addEventListener('click', () => { pick = leaf; refresh(); });
+    picks.append(b);
+  }
+  input.addEventListener('input', refresh);
+  const attach = () => {
+    const list = ((record.leaves ??= {})[leafKey(site)] ??= []);
+    if (list.length >= 9) list.shift();
+    list.push({ leaf: LEAVES.indexOf(pick), text: words().trim(), at: today() });
+    saveBook();
+    stickLeaves(site);
+    $('game-note').textContent = '돌담에 나뭇잎을 붙였어요. 다음에 이 길을 지날 때도 남아 있어요.';
+    gameButtons([['한 장 더 붙이기', () => playLeaf(site), true], ['그만하기', closeGame]]);
+  };
+  $('game-stage').replaceChildren(picks, preview, input);
+  $('game-note').textContent = '나뭇잎을 고르고 글을 쓴 뒤 붙이기를 누르세요.';
+  refresh();
+  document.fonts.load('48px "Nanum Pen Script"', '가나다').then(refresh, refresh);
+  gameButtons([['붙이기', attach, true], ['그만하기', closeGame]]);
+  input.focus({ preventScroll: true });
+}
+// 돌담 빈자리에 붙인 나뭇잎을 3×3 자리에 차례로 놓는다
+function stickLeaves(site) {
+  const group = site.leafGroup;
+  if (!group) return;
+  for (const old of [...group.children]) { group.remove(old); old.material.map.dispose(); old.material.dispose(); }
+  const list = record.leaves?.[leafKey(site)] ?? [];
+  const build = () => list.forEach((item, i) => {
+    const paper = document.createElement('canvas');
+    paper.width = paper.height = 256;
+    drawLeaf(paper.getContext('2d'), LEAVES[item.leaf] ?? LEAVES[0], item.text, 256);
+    const map = new THREE.CanvasTexture(paper);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 4;
+    const leaf = new THREE.Mesh(leafPlane, new THREE.MeshLambertMaterial({ map, alphaTest: .35, side: THREE.DoubleSide }));
+    site.leafTile?.owned.push(map, leaf.material);
+    leaf.position.set((i % 3 - 1) * .42 + (hash3(i, 1, 9) - .5) * .06, (1 - Math.floor(i / 3)) * .36 + (hash3(i, 2, 9) - .5) * .05, .45);
+    leaf.rotation.z = (hash3(i, 3, 9) - .5) * .7;
+    group.add(leaf);
+  });
+  document.fonts.load('48px "Nanum Pen Script"', '가나다').then(build, build);
+}
+const leafPlane = new THREE.PlaneGeometry(.42, .42);
+// 놀이 장소 옆의 작은 표지판
+function gameSign(tile, site, text, x = 1.5, z = .3) {
+  const g = new THREE.Group();
+  solid(g, POST, woodMat, x, .97, z - .05);
+  nameBoard(tile, g, text, x, 1.55, z, 1.2, .36);
+  setDown(tile, g, site);
+}
+
+Object.assign(SITE_BUILD, {
+  gourdGame(tile, site) {
+    site.board = '물 받기 약수터';
+    SITE_BUILD.spring(tile, site);
+  },
+  stackGame(tile, site) {
+    siteParts();
+    const rows = [[9, .78, .38], [8, .68, .35], [7, .58, .32], [6, .48, .28], [5, .38, .25], [4, .28, .22], [2, .16, .18]], floor = groundHeight(site.x, site.z);
+    // 사람 키의 80%쯤(1.35 m) 쌓인 낮은 돌탑. 옆에 얹을 돌이 놓여 있다
+    stackStones(tile, site.x, site.z, finerStones(rows));
+    site.stoneGroup = new THREE.Group();
+    site.stoneGroup.position.set(site.x, floor + .12 + rows.reduce((sum, r) => sum + r[2] * .62, 0), site.z);
+    tile.group.add(site.stoneGroup);
+    const spots = STONES.map((stone, i) => { const a = site.yaw + 1.9 + i * .38, x = site.x + Math.sin(a) * 1.5, z = site.z + Math.cos(a) * 1.5; return [x, groundHeight(x, z) + .02, z, stone.w / 260]; });
+    strewRocks(tile, spots);
+    gameSign(tile, site, '돌탑 쌓기');
+    tile.colliders.push({ x: site.x, z: site.z, r: 1.1, cam: 0 });
+    const done = site.added ?? [];
+    site.added = [];
+    done.forEach(stone => addCairnStone(site, stone));
+  },
+  photoStudio(tile, site) {
+    siteParts();
+    const g = new THREE.Group(), bowlMat = new THREE.MeshLambertMaterial({ color: '#9a6a3c' }), nutMat = new THREE.MeshLambertMaterial({ color: '#8a5a2b' }), capMat = new THREE.MeshLambertMaterial({ color: '#5c3d1e' });
+    // 낮은 그루터기 위 나무 밥그릇. 작은 동물도 닿도록 낮게 둔다
+    solid(g, rodOf(.3, .34, .2, 14), woodMat, 0, .1, 0);
+    const bowlShape = new THREE.LatheGeometry([new THREE.Vector2(.02, 0), new THREE.Vector2(.2, .01), new THREE.Vector2(.27, .07), new THREE.Vector2(.28, .13), new THREE.Vector2(.25, .13), new THREE.Vector2(.23, .07), new THREE.Vector2(.02, .04)], 24);
+    solid(g, bowlShape, bowlMat, 0, .2, 0);
+    site.acornMeshes = [];
+    for (let i = 0; i < 5; i++) {
+      const nut = new THREE.Group(), a = i * 1.26, r = i ? .1 : 0;
+      solid(nut, acornBody, nutMat, 0, 0, 0);
+      solid(nut, acornCap, capMat, 0, .03, 0);
+      nut.position.set(Math.cos(a) * r, .28, Math.sin(a) * r);
+      nut.rotation.set((hash3(i, 1, 3) - .5) * 1.4, 0, (hash3(i, 2, 3) - .5) * 1.4);
+      nut.visible = false;
+      g.add(nut);
+      site.acornMeshes.push(nut);
+    }
+    nameBoard(tile, g, '동물사진관', 0, 1.65, -.7, 1.4, .4);
+    solid(g, POST, woodMat, -.55, .97, -.74);
+    solid(g, POST, woodMat, .55, .97, -.74);
+    setDown(tile, g, site);
+    tile.owned.push(bowlShape, bowlMat, nutMat, capMat);
+    site.bowl = { x: site.x, y: (site.pad ? site.y : groundHeight(site.x, site.z)) + .3, z: site.z };
+    tile.colliders.push({ x: site.x, z: site.z, r: .36, cam: 0 });
+  },
+  leafGame(tile, site) {
+    const k = leafWallKit();
+    // 가운데가 비어 있는 산꾸 돌담. 비운 자리에 붙인 나뭇잎이 놓인다
+    k.gapFace ??= new THREE.MeshLambertMaterial({ map: leafWallTexture(true) });
+    const g = new THREE.Group(), wall = new THREE.Mesh(k.leafWall.geo, [summitRock, summitRock, summitRock, summitRock, k.gapFace, summitRock]);
+    const floor = Math.min(groundHeight(site.x, site.z), ...[-1.6, 1.6].map(d => groundHeight(site.x + Math.cos(site.yaw) * d, site.z - Math.sin(site.yaw) * d)));
+    wall.position.y = .72 + floor - groundHeight(site.x, site.z);
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    site.leafGroup = new THREE.Group();
+    site.leafTile = tile;
+    site.leafGroup.position.y = wall.position.y;
+    g.add(wall, site.leafGroup);
+    setDown(tile, g, site);
+    gameSign(tile, site, '산꾸 꾸미기', 2.4, .4);
+    for (const d of [-1.1, 1.1]) tile.colliders.push({ x: site.x + Math.cos(site.yaw) * d, z: site.z - Math.sin(site.yaw) * d, r: .8, cam: 0 });
+    stickLeaves(site);
+  },
+});
+const acornBody = new THREE.SphereGeometry(.035, 10, 8).scale(1, 1.25, 1), acornCap = new THREE.SphereGeometry(.037, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, .6, 1);
+
 function resetAmenities() {
   Object.assign(amen, { hold: false, act: null, site: null, approach: null, clock: 0, flowers: 0, energy: 0, resume: false, photo: null });
   amen.visits.clear();
   amen.hinted.clear();
   if (player) player.act = null;
-  for (const id of ['meet', 'rest-end', 'rest-fx', 'drink']) $(id).hidden = true;
+  for (const id of ['meet', 'rest-end', 'rest-fx', 'drink', 'game']) $(id).hidden = true;
   clearTimeout(meetTimer);
+  cancelAnimationFrame(game.raf);
+  if (game.studio) game.studio.beast.tame = null;
+  game.site = null;
+  game.studio = null;
 }
 function gainEnergy(n) {
   record.energy = (record.energy ?? 0) + n;
@@ -5335,6 +6028,8 @@ function holdPlayer(dt) {
 function stepAmenities(dt) {
   if (!trail?.sites || state.mode !== 'hike') return;
   if (amen.photo) { stepSummitPhoto(dt); return; }
+  if (game.studio) { stepPhotoStudio(dt); return; }
+  if (game.site) return;
   if (amen.act === 'drink') {
     amen.clock += dt;
     if (amen.clock >= DRINK_SECONDS) endDrink();
@@ -5363,6 +6058,18 @@ function stepAmenities(dt) {
   if (state.finished) return;
   const auto = autoOn();
   for (const site of trail.sites) {
+    if (GAMES[site.kind]) {
+      if (amen.visits.has(site) || Math.abs(site.s - player.s) > 24) continue;
+      const gap = Math.hypot(site.x - player.x, site.z - player.z);
+      if (auto ? Math.abs(site.s - player.s) < 1.2 && gap < 12 : gap < 5.5) {
+        amen.visits.add(site);
+        pauseAuto();
+        faceSite(site);
+        openGame(site);
+        return;
+      }
+      continue;
+    }
     const m = MEET[site.kind];
     if (!m || amen.visits.has(site) || Math.abs(site.s - player.s) > 24) continue;
     const gap = Math.hypot(site.x - player.x, site.z - player.z);
@@ -5451,7 +6158,15 @@ function stepSummitPhoto(dt) {
     player.act = null;
     showFinish(shot.url);
     const view = course.trial && summitSpot?.view;
-    if (!view) { amen.photo = null; return; }
+    if (!view) {
+      amen.photo = null;
+      $('finish').hidden = true;
+      const end = trailAt(trail.length);
+      player.yaw = Math.atan2(end.tx, end.tz);
+      togglePanorama(true);
+      pano.yaw = player.yaw;
+      return;
+    }
     // 체험 코스는 사진을 찍은 뒤 백록담이 잘 보이는 난간 앞으로 걸어가 파노라마를 편다
     $('finish').hidden = true;
     Object.assign(shot, { phase: 'view', clock: 0 });
@@ -5467,7 +6182,9 @@ function stepSummitPhoto(dt) {
     player.yaw = Math.atan2(ax, az);
     togglePanorama(true);
     pano.yaw = player.yaw;
-    pano.pitch = -Math.atan2(eyeY - view.aimY, Math.hypot(ax, az)) - .05;
+    // 드론 높이에서도 호수 한가운데가 화면 가운데에 오게 한다
+    pano.reach = Math.hypot(ax, az);
+    pano.pitch = -Math.atan2(eyeY - view.aimY, pano.reach);
   }
 }
 const snapCam = new THREE.PerspectiveCamera(38, 4 / 3, .2, 34000);
@@ -5592,7 +6309,22 @@ function ringTexture() {
   return t;
 }
 // 산꾸: 바위벽에 단풍잎, 은행잎, 초록 잎을 촘촘히 붙인 그림
-function leafWallTexture() {
+function leafWallKit() {
+  const k = siteParts();
+  if (!k.leafWall) {
+    const geo = new THREE.BoxGeometry(3.8, 1.95, .7, 28, 14, 1), p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), edge = Math.max(Math.abs(x) / 1.9, Math.abs(y) / .975);
+      p.setZ(i, z + (z > 0 ? noise2(x * 1.6, y * 1.6) * .07 - edge ** 6 * .12 : noise2(x, y) * .2));
+      p.setY(i, y + (y > .9 ? noise2(x * 2.2, 3) * .12 : 0));
+    }
+    geo.computeVertexNormals();
+    k.leafWall = { geo, face: new THREE.MeshLambertMaterial({ map: leafWallTexture() }) };
+  }
+  return k;
+}
+// gap이면 가운데를 비워 둔다. 놀이에서 붙이는 나뭇잎 아홉 장이 들어갈 자리다
+function leafWallTexture(gap = false) {
   const W = 1024, H = 512, c = document.createElement('canvas');
   c.width = W;
   c.height = H;
@@ -5631,6 +6363,7 @@ function leafWallTexture() {
     const y = hash3(i, 1, 21) ** .8 * H, x = hash3(i, 2, 21) * W;
     // 위쪽은 빽빽하고 아래쪽은 성기게
     if (hash3(i, 3, 21) < y / H * .45) continue;
+    if (gap && ((x - W / 2) / 200) ** 4 + ((y - H / 2) / 168) ** 4 < 1) continue;
     const size = 9 + hash3(i, 4, 21) * 15, shape = hash3(i, 5, 21), color = palette[Math.floor(hash3(i, 6, 21) * palette.length)];
     g.save();
     g.translate(x, y);
@@ -5711,7 +6444,7 @@ Object.assign(SITE_BUILD, {
     dipper.rotation.set(0, -.7, -.12);
     const post = new THREE.Group();
     solid(post, POST, woodMat, 0, .97, 0);
-    nameBoard(tile, post, '약수터', 0, 1.62, .1, .9, .34);
+    nameBoard(tile, post, site.board ?? '약수터', 0, 1.62, .1, site.board ? 1.35 : .9, .34);
     post.position.set(1.15, 0, .35);
     post.rotation.y = -.3;
     g.add(post);
@@ -5728,17 +6461,7 @@ Object.assign(SITE_BUILD, {
     tile.colliders.push({ x: site.x, z: site.z, r: 1.2, cam: 0 });
   },
   sangu(tile, site) {
-    const k = siteParts();
-    if (!k.leafWall) {
-      const geo = new THREE.BoxGeometry(3.8, 1.95, .7, 28, 14, 1), p = geo.attributes.position;
-      for (let i = 0; i < p.count; i++) {
-        const x = p.getX(i), y = p.getY(i), z = p.getZ(i), edge = Math.max(Math.abs(x) / 1.9, Math.abs(y) / .975);
-        p.setZ(i, z + (z > 0 ? noise2(x * 1.6, y * 1.6) * .07 - edge ** 6 * .12 : noise2(x, y) * .2));
-        p.setY(i, y + (y > .9 ? noise2(x * 2.2, 3) * .12 : 0));
-      }
-      geo.computeVertexNormals();
-      k.leafWall = { geo, face: new THREE.MeshLambertMaterial({ map: leafWallTexture() }) };
-    }
+    const k = leafWallKit();
     const g = new THREE.Group(), wall = new THREE.Mesh(k.leafWall.geo, [summitRock, summitRock, summitRock, summitRock, k.leafWall.face, summitRock]);
     const floor = Math.min(groundHeight(site.x, site.z), ...[-1.6, 1.6].map(d => groundHeight(site.x + Math.cos(site.yaw) * d, site.z - Math.sin(site.yaw) * d)));
     wall.position.y = .72 + floor - groundHeight(site.x, site.z);
@@ -7248,6 +7971,7 @@ class Beast {
   }
   step(dt) {
     const { kind } = this;
+    if (this.tame) return this.tamed(dt);
     if (kind.flies) return this.soar(dt);
     this.age += dt;
     this.clock -= dt;
@@ -7352,6 +8076,33 @@ class Beast {
     if (this.checkClock > 0) return false;
     this.checkClock = .25;
     return gap > (kind.big ? 110 : 45) || (this.clock < 0 && (this.clock < -7 || unseen(this.x, this.y + .3, this.z)));
+  }
+  // 동물사진관: 밥그릇으로 걸어와 도토리를 먹고, 사진기 쪽으로 고개를 돌린다
+  tamed(dt) {
+    const { kind } = this, t = this.tame;
+    this.age += dt;
+    let speed = 0, down = 0, perk = 0, turn = 0;
+    if (t.phase === 'come') {
+      t.clock += dt;
+      const d = Math.hypot(t.x - this.x, t.z - this.z);
+      if (d < .3 || t.clock > 9) {
+        if (d >= .3) { this.x = t.x; this.z = t.z; }
+        t.phase = 'eat';
+      } else {
+        speed = Math.min(kind.walk * 1.6, kind.run * .5);
+        this.go(speed, Math.atan2(t.x - this.x, t.z - this.z), dt);
+      }
+    } else {
+      this.yaw += angleGap(this.yaw, t.face) * (1 - Math.exp(-dt * 4));
+      if (t.phase === 'eat') down = kind.nibble;
+      else { perk = .7; turn = clamp(angleGap(this.yaw, Math.atan2(t.camX - this.x, t.camZ - this.z)), -1.1, 1.1); }
+    }
+    this.rear = lerp(this.rear, 0, 1 - Math.exp(-dt * 9));
+    this.sit = lerp(this.sit, 0, 1 - Math.exp(-dt * 5));
+    this.animate(dt, speed, down, turn, perk, this.rear);
+    this.pose(dt);
+    if (this.glow) this.glow.rotation.y += dt * .7;
+    return false;
   }
   pickStroll() {
     const a = Math.random() * 6.28, far = 3 + Math.random() * 6;
@@ -8326,6 +9077,8 @@ function bindControls() {
       return;
     }
     if (!$('promo').hidden) { if (e.code === 'Escape') closePromo(); return; }
+    if (!$('game').hidden) { if (e.code === 'Escape') closeGame(); return; }
+    if (game.studio) return;
     if (state.mode === 'intro' && e.code === 'Escape' && !$('map-panel').classList.contains('mini')) sizeMap(false);
     if (state.mode !== 'hike') return;
     if (e.code === 'KeyB' && !e.repeat && !pano.on) { openBook(); return; }
@@ -8357,6 +9110,14 @@ function bindControls() {
   addEventListener('keyup', e => { if (e.code === 'Escape') $('flora').hidden = true; });
   $('start').addEventListener('click', () => enterHike(pickedMountain?.id));
   $('trial').addEventListener('click', () => enterHike(TRIAL.id));
+  // 고화질은 모형을 처음 만들 때 정해지므로, 바꾸면 페이지를 다시 연다
+  const hdButton = $('hd-toggle');
+  hdButton.setAttribute('aria-pressed', String(HD));
+  hdButton.textContent = HD ? '고화질 켜짐' : '고화질 꺼짐';
+  hdButton.addEventListener('click', () => {
+    try { localStorage.setItem('oreumgil-hd', HD ? '0' : '1'); } catch {}
+    location.reload();
+  });
   // 코스 지도 축소·확대. 고른 크기는 이 브라우저에 기억한다
   const zoomMap = small => {
     $('course-map-box').classList.toggle('small', small);
@@ -8598,7 +9359,7 @@ async function openCourse(id) {
 
 /* ---------- 도감 기록: 이 브라우저에 먼저 저장하고, 계정이 있으면 계정에도 저장한다 ---------- */
 const BOOK_KEY = 'oreumgil-book';
-const record = { flowers: {}, stones: {}, myths: {}, energy: 0 };
+const record = { flowers: {}, stones: {}, myths: {}, energy: 0, acorns: 0, studio: [], leaves: {} };
 let bookDoc = null, bookTimer = 0;
 const today = () => new Date().toISOString().slice(0, 10);
 // 어느 기기에서 얻은 기록이든 잃지 않도록 합친다
@@ -8606,6 +9367,11 @@ function mergeRecord(from) {
   if (!from) return;
   record.look ??= from.look;
   record.energy = Math.max(record.energy ?? 0, from.energy ?? 0);
+  record.acorns = Math.max(record.acorns ?? 0, from.acorns ?? 0);
+  const shots = new Map([...(record.studio ?? []), ...(from.studio ?? [])].map(shot => [shot.id, shot]));
+  record.studio = [...shots.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+  record.leaves ??= {};
+  for (const [key, list] of Object.entries(from.leaves ?? {})) if ((record.leaves[key]?.length ?? 0) < list.length) record.leaves[key] = list;
   for (const part of ['flowers', 'myths']) for (const [id, at] of Object.entries(from[part] ?? {})) if (!record[part][id] || at < record[part][id]) record[part][id] = at;
   for (const [id, stone] of Object.entries(from.stones ?? {})) {
     const old = record.stones[id];
@@ -8737,7 +9503,7 @@ function mythShelf(body) {
   body.append(grid);
 }
 function renderBook() {
-  const counts = { flowers: `${Object.keys(record.flowers).length}/${FLORA.length}`, stones: `${Object.keys(record.stones).length}/${catalog.length}`, myths: `${Object.keys(record.myths).length}/${MYTHS.length}` };
+  const counts = { flowers: `${Object.keys(record.flowers).length}/${FLORA.length}`, stones: `${Object.keys(record.stones).length}/${catalog.length}`, myths: `${Object.keys(record.myths).length}/${MYTHS.length}`, studio: `${(record.studio ?? []).length}장` };
   for (const tab of document.querySelectorAll('.book-tabs [role="tab"]')) {
     const on = tab.dataset.tab === bookTab;
     tab.setAttribute('aria-selected', String(on));
@@ -8747,7 +9513,7 @@ function renderBook() {
   const body = $('book-body');
   body.replaceChildren();
   body.scrollTop = 0;
-  ({ flowers: flowerShelf, stones: stoneShelf, myths: mythShelf })[bookTab](body);
+  ({ flowers: flowerShelf, stones: stoneShelf, myths: mythShelf, studio: studioShelf })[bookTab](body);
 }
 function openBook(tab = bookTab) {
   bookTab = tab;
@@ -9252,7 +10018,8 @@ function buildMap() {
 }
 
 /* ---------- 파노라마: 멈춘 자리에서 눈높이로 천천히 한 바퀴 둘러본다 ---------- */
-const PANO_SECONDS = 50, PANO_LOOK_UP = .26, PANO_LOOK_DOWN = -.14, SUMMIT_ZONE = 30;
+const PANO_SECONDS = 50 / 1.5, PANO_LOOK_UP = .26, PANO_LOOK_DOWN = -.14, SUMMIT_ZONE = 30;
+const DRONE_BACK = 9, DRONE_LIFT = 4.6;
 const pano = { on: false, leaving: false, blend: 0, angle: 0, yaw: 0, pitch: 0, gap: 0, reopen: false, from: new THREE.Vector3(), fromQ: new THREE.Quaternion(), rig: new THREE.PerspectiveCamera(), look: new THREE.Vector3() };
 function togglePanorama(reopen = false) {
   if (state.mode !== 'hike') return;
@@ -9260,7 +10027,7 @@ function togglePanorama(reopen = false) {
   walkTo(null);
   keys.clear();
   const atTop = player.done || trail.length - player.s < SUMMIT_ZONE;
-  Object.assign(pano, { on: true, leaving: false, blend: 0, angle: 0, yaw: cam.yaw + Math.PI, pitch: atTop ? summitSpot?.panoPitch ?? PANO_LOOK_DOWN : PANO_LOOK_UP, gap: atTop ? 0 : 1, reopen });
+  Object.assign(pano, { on: true, leaving: false, blend: 0, angle: 0, yaw: cam.yaw + Math.PI, pitch: atTop ? summitSpot?.panoPitch ?? PANO_LOOK_DOWN : PANO_LOOK_UP, gap: atTop ? 0 : 1, reopen, drone: atTop, reach: 40 });
   pano.from.copy(camera.position);
   pano.fromQ.copy(camera.quaternion);
   $('finish').hidden = true;
@@ -9288,14 +10055,21 @@ function stepPanorama(dt) {
     if (pano.angle >= 6.28318) pano.leaving = true;
   }
   const p = player.model.root.position, heading = pano.yaw + pano.angle, flat = Math.cos(pano.pitch);
-  pano.rig.position.set(p.x, p.y + 1.62, p.z);
-  pano.look.set(p.x + Math.sin(heading) * flat * 10, p.y + 1.62 + Math.sin(pano.pitch) * 10, p.z + Math.cos(heading) * flat * 10);
+  if (pano.drone) {
+    // 드론이 등산객 뒤쪽 위에 떠서, 등산객 어깨 너머로 내려다보며 한 바퀴 돈다
+    const sx = Math.sin(heading), sz = Math.cos(heading), eyeY = p.y + 1.62, cx = p.x - sx * DRONE_BACK, cz = p.z - sz * DRONE_BACK;
+    pano.rig.position.set(cx, Math.max(eyeY + DRONE_LIFT + Math.sin(pano.angle * 2) * .35, groundHeight(cx, cz) + 2.2), cz);
+    pano.look.set(p.x + sx * pano.reach, eyeY + Math.tan(pano.pitch) * pano.reach, p.z + sz * pano.reach);
+  } else {
+    pano.rig.position.set(p.x, p.y + 1.62, p.z);
+    pano.look.set(p.x + Math.sin(heading) * flat * 10, p.y + 1.62 + Math.sin(pano.pitch) * 10, p.z + Math.cos(heading) * flat * 10);
+  }
   pano.rig.lookAt(pano.look);
   camera.position.lerpVectors(pano.from, pano.rig.position, k);
   camera.quaternion.slerpQuaternions(pano.fromQ, pano.rig.quaternion, k);
-  camera.fov = lerp(52, 64, k);
+  camera.fov = lerp(52, pano.drone ? 58 : 64, k);
   camera.updateProjectionMatrix();
-  player.model.root.visible = k < .45;
+  player.model.root.visible = pano.drone || k < .45;
   canopyGap.value.set(p.x, p.y + 1.62, p.z, k * pano.gap);
   if (pano.leaving && pano.blend === 0) endPanorama();
 }
@@ -9430,7 +10204,7 @@ function waterLevel() {
     if (site.x === undefined || Math.abs(site.s - player.s) > 120) continue;
     const d = Math.hypot(site.x - player.x, site.z - player.z);
     if (site.kind === 'fall') level = Math.max(level, 1 - smooth(10, 70, d));
-    else if (site.kind === 'spring') level = Math.max(level, .35 * (1 - smooth(3, 16, d)));
+    else if (site.kind === 'spring' || site.kind === 'gourdGame') level = Math.max(level, .35 * (1 - smooth(3, 16, d)));
   }
   return level;
 }
@@ -9655,7 +10429,7 @@ function buildCourseMap() {
   stroke(5, '#d8452e');
   // 코스에 세운 장소: 작은 것은 점으로, 큰 것은 글자 표시와 이름으로 그린다
   // 이름 없이 고루 세운 정자, 쉼터, 약수터, 돌탑은 지도에 적지 않는다
-  const generic = site => ['pavilion', 'rest', 'spring', 'cairn'].includes(site.kind) && (site.made || /^(정자|쉼터|약수터|돌탑)$/.test(site.label));
+  const generic = site => GAMES[site.kind] || (['pavilion', 'rest', 'spring', 'cairn'].includes(site.kind) && (site.made || /^(정자|쉼터|약수터|돌탑)$/.test(site.label)));
   const marks = [...trail.sites.filter(site => !generic(site)).map(site => ({ ...site, ...(site.x === undefined ? (p => ({ x: p.x, z: p.z }))(trailAt(site.s)) : {}) })), ...trail.spans.map(span => { const p = trailAt((span.a + span.b) / 2); return { kind: 'bridge', x: p.x, z: p.z, label: span.label }; })];
   for (const site of marks) {
     if (MAP_MARK[site.kind]) continue;
@@ -9910,7 +10684,7 @@ async function boot() {
       return { medianMs: +times[n >> 1].toFixed(1), worstMs: +times[n - 1].toFixed(1), pixelRatio: renderer.getPixelRatio(), size: [innerWidth, innerHeight] };
     },
     colliders() { collectColliders(player.x, player.z, 11); return around.slice(); },
-    pano, togglePanorama, groundHeight, summitWords, scenery, sceneView: () => farland?.view, sites: () => trail.sites, amen: () => amen, beginSite: begin, endRest, summitPhoto, stoneSpot: () => stoneSpot, streams: () => trail.streams, spans: () => trail.spans, stonePose: () => ({ x: stoneSpot.x, z: stoneSpot.z, floor: stoneSpot.y, cairn: cairnSpot }), cloudOpacity: () => cloudSea?.material.opacity ?? 0, record, openBook, closeBook, replaySummit, portraitOf, saveBook, MYTHS, wild: { bugs, beasts, INSECTS, ANIMALS, Beast, addBug, addBeast, clearWild, step: stepWild, clock: wildClock, unseen },
+    HD, pano, togglePanorama, groundHeight, game, GAMES, openGame, closeGame, startStudio, summitWords, scenery, sceneView: () => farland?.view, sites: () => trail.sites, amen: () => amen, beginSite: begin, endRest, summitPhoto, stoneSpot: () => stoneSpot, streams: () => trail.streams, spans: () => trail.spans, stonePose: () => ({ x: stoneSpot.x, z: stoneSpot.z, floor: stoneSpot.y, cairn: cairnSpot }), cloudOpacity: () => cloudSea?.material.opacity ?? 0, record, openBook, closeBook, replaySummit, portraitOf, saveBook, MYTHS, wild: { bugs, beasts, INSECTS, ANIMALS, Beast, addBug, addBeast, clearWild, step: stepWild, clock: wildClock, unseen },
     openFlora, refreshHud, checkPlaces, updateFlowerTag, flowerTarget: () => flowerNear, flora: FLORA, plantKinds: () => kinds, tilesFlowers: () => [...tiles.values()].flatMap(t => t.flowers),
     stats() {
       let instances = 0, ready = 0;
