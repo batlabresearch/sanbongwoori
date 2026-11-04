@@ -164,9 +164,19 @@ h1 small { margin-left: 9px; font-family: var(--ui); font-weight: 500; font-size
 .pin.hot path:first-child, .pin.picked path:first-child { fill: var(--ribbon); }
 .pin.picked .pin-mark { transform: scale(calc(var(--pin) * 1.55)); }
 .go-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, 240px) auto; align-items: stretch; gap: 8px; }
-.peak-card { min-width: 0; padding: 8px 12px; display: grid; gap: 2px; align-content: center; border: 1px solid var(--line); border-radius: 4px; background: var(--shade); }
-.peak-card b { font-family: var(--display); font-weight: 800; font-size: 17px; }
-.peak-card span { font-size: 13px; color: var(--carve-dim); font-variant-numeric: tabular-nums; }
+.peak-card { min-width: 0; padding: 8px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-content: center; align-items: center; border: 1px solid var(--line); border-radius: 4px; background: var(--shade); color: var(--carve); font: inherit; text-align: left; }
+.peak-card b { grid-column: 1; font-family: var(--display); font-weight: 800; font-size: 17px; }
+.peak-card span { grid-column: 1; font-size: 13px; color: var(--carve-dim); font-variant-numeric: tabular-nums; }
+.peak-card i { grid-column: 2; grid-row: 1 / span 2; font-style: normal; font-size: 15px; font-weight: 700; white-space: nowrap; }
+.peak-card:disabled { cursor: default; }
+.peak-card:disabled i { display: none; }
+.peak-card:not(:disabled) { border-color: var(--ribbon); background: var(--ribbon); color: var(--bark); cursor: pointer; }
+.peak-card:not(:disabled) span { color: rgba(42, 32, 21, .78); }
+.peak-card:not(:disabled):hover { filter: brightness(1.06); }
+.peak-card:focus-visible, .trial-go:focus-visible { outline: 2px solid var(--carve); outline-offset: 2px; }
+.trial-go { display: grid; align-content: center; gap: 2px; padding: 6px 12px; line-height: 1.25; }
+.trial-go small { font-size: 12px; font-weight: 500; opacity: .8; }
+.go-row.picked .trial-go { border: 1px solid var(--ribbon); background: transparent; color: var(--carve); }
 .peak-card.pop { animation: cardPop .4s ease-out; }
 @keyframes cardPop { from { transform: translateY(8px); border-color: var(--ribbon); } }
 .go:disabled { background: var(--plank-dark); color: var(--carve-dim); cursor: default; }
@@ -512,12 +522,13 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
         <div class="peak-list" id="peak-list" aria-label="이 지역의 산"></div>
       </div>
     </div>
-    <div class="go-row">
-      <div class="peak-card" id="peak-card" aria-live="polite">
+    <div class="go-row" id="go-row">
+      <button class="peak-card" id="start" type="button" disabled aria-live="polite">
         <b id="peak-name">지도에서 산을 고르세요</b>
-        <span id="peak-facts">체력 100으로 출발합니다</span>
-      </div>
-      <button class="go" id="start" type="button" disabled>산을 골라 주세요</button>
+        <span id="peak-facts">산을 고르면 여기를 눌러 출발합니다 · 체력 100</span>
+        <i aria-hidden="true">등산 시작</i>
+      </button>
+      <button class="go trial-go" id="trial" type="button">짧은 등산 체험해보기<small>한라산을 10분 코스로 줄였습니다</small></button>
       <button class="tool" id="book-intro" type="button">도감 보기</button>
     </div>
     <p class="keys" id="keys">WASD·방향키로 걷기, 바닥 클릭으로 그 지점까지 걷기, 오른쪽 버튼을 누른 채 움직여 시점 바꾸기, 스페이스로 자동 등산, P로 파노라마, B로 도감.</p>
@@ -756,6 +767,25 @@ function describeTrail(data) {
   }
   t.hard = boxBlur(hard, 6, 2);
   t.pave = boxBlur(pave, 6, 2);
+  // 겨울 코스: 흙길, 계단, 데크, 바위 같은 노면마다 절반쯤을 눈 덮인 구간으로 나눈다
+  t.snow = new Float32Array(n + 1);
+  if (course.winter) {
+    const raw = new Float32Array(n + 1), piece = 16, turn = {};
+    for (let a = 0; a <= n;) {
+      let b = a;
+      while (b <= n && t.surface[b] === t.surface[a]) b++;
+      const kind = t.surface[a], run = (b - a) * t.ds;
+      if (run < piece * 1.5) {
+        turn[kind] = !turn[kind];
+        raw.fill(turn[kind] ? 1 : 0, a, b);
+      } else {
+        const count = Math.max(2, Math.round(run / piece)), first = hash3(a, kind, 5) < .5 ? 1 : 0;
+        for (let i = a; i < b; i++) raw[i] = (Math.floor((i - a) / (b - a) * count) + first) % 2;
+      }
+      a = b;
+    }
+    t.snow = boxBlur(raw, 3);
+  }
   const channels = [0, 1, 2, 3].map(() => new Float32Array(n + 1));
   for (let i = 0; i <= n; i++) {
     const mix = DECOR[t.decor[decorIndex(i)]]?.splat ?? DECOR.mixed.splat;
@@ -1398,7 +1428,7 @@ function terrainCompile(shader) {
   const { mask, ox, oz } = this.userData;
   Object.assign(shader.uniforms, {
     uGround: { value: textures.groundDetail }, uPath: { value: textures.pathDetail }, uMottle: { value: textures.mottle }, uMask: { value: mask },
-    uTile: { value: new THREE.Vector3(ox, oz, TILE) }, uY0: { value: trail.y0 }, uY1: { value: trail.y1 },
+    uTile: { value: new THREE.Vector3(ox, oz, TILE) }, uY0: { value: trail.y0 }, uY1: { value: trail.y1 }, uSnow: { value: course.winter ? 1 : 0 },
   });
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', '#include <common>\nattribute vec4 aSplat;\nvarying vec4 vSplat;\nvarying vec3 vWP;\nvarying vec3 vWN;')
@@ -1406,7 +1436,7 @@ function terrainCompile(shader) {
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', `#include <common>
       uniform sampler2D uGround; uniform sampler2D uPath; uniform sampler2D uMottle; uniform sampler2D uMask;
-      uniform vec3 uTile; uniform float uY0; uniform float uY1;
+      uniform vec3 uTile; uniform float uY0; uniform float uY1; uniform float uSnow;
       varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN;`)
     .replace('#include <map_fragment>', `
       vec2 wp = vWP.xz;
@@ -1441,15 +1471,26 @@ function terrainCompile(shader) {
       ground = mix(ground, mix(vec3(.07, .07, .065), vec3(.3, .29, .265), cliff.a), bareRock);
       relief = mix(relief, cliff.a, bareRock);
 
+      // 겨울: 땅 대부분에 눈이 두껍게 쌓이고, 가파른 바위와 군데군데만 드러난다
+      if (uSnow > 0.0) {
+        float cover = smoothstep(.12, .42, large * .55 + wob * .45 + .18 - slope * 1.1);
+        ground = mix(ground, mix(vec3(.7, .74, .8), vec3(.93, .95, .97), g.r * .5 + wob * .5), cover);
+        relief = mix(relief, .5 + (wob - .5) * .15, cover);
+      }
+
       // 길: 흙, 자갈과 바위, 포장이 구간을 따라 부드럽게 바뀐다
       vec4 m = texture2D(uMask, vec2((wp.x - uTile.x) / uTile.z, 1.0 - (wp.y - uTile.y) / uTile.z));
       float edge = (texture2D(uMottle, wp * .09).r - .5) * .55;
       float path = smoothstep(.34, .6, m.r + edge);
       float hard = smoothstep(.28, .72, m.g / max(m.r, .02) + (p.r - .5) * .4);
       float pave = smoothstep(.3, .7, m.b / max(m.r, .02) + (wob - .5) * .35);
+      float packed = pave * uSnow;
+      pave *= 1.0 - uSnow;
       vec3 stones = mix(mix(vec3(.08, .075, .07), vec3(.3, .29, .265), p.a), mix(vec3(.055, .055, .05), vec3(.33, .31, .28), p.g), .6);
       vec3 walked = mix(soil, stones, hard);
       walked = mix(walked, mix(vec3(.13, .13, .125), vec3(.27, .265, .25), p.b), pave);
+      // 겨울: 사람들이 밟아 다진 눈길
+      walked = mix(walked, mix(vec3(.58, .61, .66), vec3(.86, .88, .92), p.g * .6 + wob * .4), packed);
       diffuseColor.rgb = mix(ground, walked, path);
       relief = mix(relief, mix(mix(p.r, p.g, hard), p.b * .4, pave), path);
     `)
@@ -1544,8 +1585,10 @@ function cityGap(x, z) {
   for (const [cx, cz, r] of scenery.cities) best = Math.min(best, Math.hypot(x - cx, z - cz) - r);
   return best;
 }
-const sceneWater = new THREE.MeshLambertMaterial({ color: '#5f93ad', emissive: '#284856', side: THREE.DoubleSide });
+// 먼 경치의 호수, 강, 바다도 같은 물로 그린다. 멀리서 보므로 물결을 열 배 크게 한다
+let sceneWater = null;
 function addWaterScape(y) {
+  sceneWater ??= waterMaterial({ color: '#5f93ad', emissive: '#284856', side: THREE.DoubleSide }, 10);
   const P = [], I = [], width = 270;
   for (const [ax, az, bx, bz] of scenery.rivers) {
     const dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz) || 1, nx = -dz / l * width, nz = dx / l * width, at = P.length / 3;
@@ -1573,11 +1616,13 @@ function addWaterScape(y) {
     g.setIndex(I);
     g.computeVertexNormals();
     const water = new THREE.Mesh(g, sceneWater);
+    water.onBeforeRender = aimSunGlint;
     scene.add(water);
     backdrop.push(water);
   }
   if (scenery.sea) {
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(90000, 90000).rotateX(-Math.PI / 2), sceneWater);
+    sea.onBeforeRender = aimSunGlint;
     sea.position.set(0, -2, 0);
     scene.add(sea);
     backdrop.push(sea);
@@ -1667,8 +1712,9 @@ function addCloudSea() {
   cloudSea = null;
   if (course.top < CLOUD_TOP) return;
   cloudMap ??= cloudTexture();
-  const y = trail.y1 - clamp((trail.y1 - trail.y0) * .62, 300, 560);
-  const sheet = new THREE.Mesh(new THREE.CircleGeometry(21000, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: cloudMap, transparent: true, opacity: Math.min(...farland.view) < 12000 ? .5 : .95, depthWrite: false, fog: false }));
+  const y = course.trial ? trail.y0 - 650 : trail.y1 - clamp((trail.y1 - trail.y0) * .62, 300, 560);
+  const opacity = course.trial ? .4 : Math.min(...farland.view) < 12000 ? .5 : .95;
+  const sheet = new THREE.Mesh(new THREE.CircleGeometry(21000, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: cloudMap, transparent: true, opacity, depthWrite: false, fog: false }));
   sheet.position.set(trail.xs[trail.n], y, trail.zs[trail.n]);
   sheet.onBeforeRender = () => cloudMap.offset.set(time.value * .0016, time.value * .0009);
   sheet.renderOrder = 5;
@@ -1695,9 +1741,9 @@ function ridged(x, z) {
 
 function buildBackdrop() {
   const { minX, minZ, maxX, maxZ, cell, cols, rows, center, floor, span } = guide;
-  const skip = Math.max(1, Math.ceil(cols / (LOW ? 120 : 190)));
-  const segX = Math.floor((cols - 1) / skip), segZ = Math.floor((rows - 1) / skip);
-  const width = segX * skip * cell, depth = segZ * skip * cell;
+  // 정상에서 내려다보이는 땅은 예전(한 변 190칸)보다 점을 다섯 배로 늘려 지형이 자세하다
+  const most = LOW ? 270 : 425, width = maxX - minX, depth = maxZ - minZ, longer = Math.max(width, depth);
+  const segX = Math.max(8, Math.round(most * width / longer)), segZ = Math.max(8, Math.round(most * depth / longer));
   const geo = new THREE.PlaneGeometry(width, depth, segX, segZ);
   geo.rotateX(-Math.PI / 2);
   geo.translate(minX + width / 2, 0, minZ + depth / 2);
@@ -1715,6 +1761,7 @@ function buildBackdrop() {
   const mat = new THREE.MeshLambertMaterial({ color: '#ffffff' });
   mat.onBeforeCompile = shader => {
     shader.uniforms.uHole = hole;
+    shader.uniforms.uSnowLine = { value: course.winter ? trail.y0 - 800 : 1e9 };
     shader.uniforms.uRect = { value: new THREE.Vector4(minX, minZ, maxX, maxZ) };
     shader.uniforms.uMid = { value: new THREE.Vector2(center.x, center.z) };
     shader.uniforms.uTones = { value: [green, blue, haze, pave] };
@@ -1722,24 +1769,37 @@ function buildBackdrop() {
     shader.uniforms.uMottle = { value: textures.mottle };
     shader.uniforms.uFloor = { value: floor };
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float aTown;\nvarying float vTown;\nvarying vec3 vWP;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = position;\nvTown = aTown;');
+      .replace('#include <common>', '#include <common>\nattribute float aTown;\nvarying float vTown;\nvarying vec3 vWP;\nvarying vec3 vWN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = position;\nvWN = normal;\nvTown = aTown;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vTown;\nuniform vec4 uRect;\nuniform vec2 uMid;\nuniform vec3 uTones[4];\nuniform vec3 uHole;\nuniform sampler2D uForest;\nuniform sampler2D uMottle;\nuniform float uFloor;\nvarying vec3 vWP;')
+      .replace('#include <common>', '#include <common>\nvarying float vTown;\nuniform vec4 uRect;\nuniform vec2 uMid;\nuniform vec3 uTones[4];\nuniform vec3 uHole;\nuniform sampler2D uForest;\nuniform sampler2D uMottle;\nuniform float uFloor;\nuniform float uSnowLine;\nvarying vec3 vWP;\nvarying vec3 vWN;')
       .replace('#include <map_fragment>', `
         if (distance(vWP.xz, uHole.xy) < uHole.z) discard;
         vec3 woods = mix(texture2D(uForest, vWP.xz * .011).rgb, vec3(.09, .15, .07), .45) * (.72 + texture2D(uMottle, vWP.xz * .0021).r * .62);
-        // 낮은 곳은 논밭과 마을이 조각조각 보인다
+        // 내려다볼 때 우듬지 하나하나와 숲결이 보이도록 다섯 배 잘게 한 무늬를 겹친다
+        vec3 crowns = texture2D(uForest, vWP.xz * .055 + .37).rgb;
+        woods *= (.62 + crowns * .9) * (.85 + texture2D(uMottle, vWP.xz * .0105).r * .3);
+        // 낮은 곳은 논밭과 마을이 조각조각 보인다. 밭마다 고랑이 나 있고 밭 사이로 농로가 지난다
         vec2 plot = floor(vWP.xz / 46.0);
         float pick = fract(sin(dot(plot, vec2(12.9898, 78.233))) * 43758.5453);
         vec3 field = mix(vec3(.1, .14, .06), vec3(.16, .17, .08), pick);
         if (pick > .9) field = mix(field, vec3(.2, .2, .18), .4);
+        vec2 rowsAt = fract(vWP.xz / 4.6 + pick);
+        field *= .88 + smoothstep(.15, .5, abs(pick > .5 ? rowsAt.x - .5 : rowsAt.y - .5)) * .16;
+        vec2 lane = abs(fract(vWP.xz / 46.0) - .5);
+        field = mix(field, vec3(.25, .23, .19), smoothstep(.475, .492, max(lane.x, lane.y)));
         float low = 1.0 - smoothstep(uFloor + 30.0, uFloor + 95.0, vWP.y + (texture2D(uMottle, vWP.xz * .0018).r - .5) * 90.0);
         float blot = texture2D(uMottle, vWP.xz * .0021).r;
         vec3 ground = mix(mix(woods, field, low * .9), mix(uTones[3], uTones[0], clamp(blot * 1.2 - .3, 0.0, .55)) * (.93 + pick * .14), vTown * low);
         float spread = distance(vWP.xz, uMid), rim = min(min(vWP.x - uRect.x, uRect.z - vWP.x), min(vWP.z - uRect.y, uRect.w - vWP.z));
         vec3 farTone = mix(mix(uTones[0], uTones[1], smoothstep(2500.0, 9000.0, spread)), uTones[2], smoothstep(9000.0, 24000.0, spread));
+        // 가파른 비탈은 바위가 드러난다
+        float steep = 1.0 - normalize(vWN).y;
+        ground = mix(ground, mix(vec3(.15, .14, .12), vec3(.31, .29, .26), texture2D(uMottle, vWP.xz * .03).r), smoothstep(.32, .58, steep) * (1.0 - vTown * low));
         diffuseColor.rgb = mix(farTone, ground, smoothstep(0.0, 520.0, rim));
+        // 겨울 코스: 높은 곳은 눈에 덮인다
+        float snowAt = smoothstep(uSnowLine, uSnowLine + 140.0, vWP.y + (blot - .5) * 220.0) * (1.0 - smoothstep(.5, .75, steep));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.8, .83, .87) * (.92 + crowns.g * .12), snowAt);
       `);
   };
   const land = new THREE.Mesh(geo, mat);
@@ -1749,7 +1809,7 @@ function buildBackdrop() {
   addWaterScape(floor + 5);
 
   // 겹겹이 이어지는 먼 산줄기
-  const size = 62000, seg = LOW ? 140 : 210;
+  const size = 62000, seg = LOW ? 180 : 300, snowTone = new THREE.Color('#d9dfe6'), snowLine = course.winter ? trail.y0 - 800 : Infinity;
   const ranges = new THREE.PlaneGeometry(size, size, seg, seg);
   ranges.rotateX(-Math.PI / 2);
   ranges.translate(center.x, 0, center.z);
@@ -1762,6 +1822,7 @@ function buildBackdrop() {
     rp.setY(i, inside ? floor - 500 : dry ? farHeight(x, z) : -60);
     mix.copy(green).lerp(blue, smooth(2500, 9000, r));
     mix.lerp(road.copy(pave).lerp(green, Math.max(clamp(ridged(x * .0013 + 2, z * .0013 + 5) - .3, 0, .55), hillAt(x, z))), (1 - smooth(-200, 900, town)) * .85);
+    if (rp.getY(i) > snowLine) mix.lerp(snowTone, smooth(snowLine, snowLine + 260, rp.getY(i)) * .9);
     mix.lerp(haze, smooth(9000, 24000, r));
     colors.set([mix.r, mix.g, mix.b], i * 3);
   }
@@ -1882,6 +1943,37 @@ function swayMaterial(amount, options = {}, foliage = false) {
           #endif
         #endif`);
   };
+  return m;
+}
+
+// 위를 향한 면에 눈을 얹은 재질. 원래 재질의 셰이더 고치기를 먼저 하고 이어서 덧붙인다
+function snowy(material) {
+  const m = material.clone(), before = material.onBeforeCompile, key = material.customProgramCacheKey();
+  m.onBeforeCompile = (shader, renderer) => {
+    before.call(m, shader, renderer);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vSnowUp;\nvarying vec3 vSnowP;')
+      .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+        {
+          vec3 up = objectNormal;
+          vec4 at = vec4(position, 1.0);
+          #ifdef USE_INSTANCING
+            up = mat3(instanceMatrix) * up;
+            at = instanceMatrix * at;
+          #endif
+          vSnowUp = normalize(mat3(modelMatrix) * up).y;
+          vSnowP = (modelMatrix * at).xyz;
+        }`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vSnowUp;\nvarying vec3 vSnowP;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        {
+          float grain = fract(sin(dot(floor(vSnowP * 7.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+          float cover = smoothstep(.2, .55, vSnowUp + (grain - .5) * .3);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.86, .89, .93) * (.92 + grain * .08), cover);
+        }`);
+  };
+  m.customProgramCacheKey = () => `snowy|${key}`;
   return m;
 }
 
@@ -3061,6 +3153,19 @@ function plantKinds() {
     post: { parts: [{ geo: toGeometry(post), mat: logMat, cast: true }], layer: 'small' },
     ropeSeg: { parts: [{ geo: toGeometry(rope), mat: logMat }], layer: 'small' },
   });
+
+  // 겨울 코스용: 잎을 뗀 나무, 가지와 윗면에 눈이 쌓인 나무·바위·계단
+  const snowMats = new Map(), snowOf = mat => { if (!snowMats.has(mat)) snowMats.set(mat, snowy(mat)); return snowMats.get(mat); };
+  for (const [name, spec] of Object.entries({ ...out })) {
+    const base = name.replace(/(Low|Far)$/, '');
+    if (TREES[base] || base.startsWith('young')) {
+      const wood = spec.parts[0];
+      out[winterName(name, 'Bare')] = { parts: [wood], layer: spec.layer };
+      out[winterName(name, 'Snow')] = { parts: [{ ...wood, mat: snowOf(wood.mat) }], layer: spec.layer };
+    } else if (SNOW_CAPPED.has(name) || SNOW_PATH.has(name)) {
+      out[winterName(name, 'Snow')] = { parts: spec.parts.map(part => ({ ...part, mat: snowOf(part.mat) })), layer: spec.layer };
+    }
+  }
   return out;
 }
 
@@ -3158,7 +3263,7 @@ function drawMask(tile) {
       const a = list[n - 1], b = list[n];
       if (b - a > 2) continue;
       const v = alpha * 255;
-      g.strokeStyle = `rgb(${v},${v * trail.hard[b]},${v * trail.pave[b]})`;
+      g.strokeStyle = `rgb(${v},${v * trail.hard[b]},${v * (course.winter ? trail.snow[b] : trail.pave[b])})`;
       g.beginPath();
       g.moveTo((trail.xs[a] - tile.ox) * k, (trail.zs[a] - tile.oz) * k);
       g.lineTo((trail.xs[b] - tile.ox) * k, (trail.zs[b] - tile.oz) * k);
@@ -3335,7 +3440,7 @@ function* plantTile(tile) {
 
   for (const site of trail.sites) {
     if (site.kind !== 'tree' || site.x < tile.ox || site.x >= tile.ox + TILE || site.z < tile.oz || site.z >= tile.oz + TILE) continue;
-    const kind = /주목/.test(site.label) ? 'yew' : 'pine', item = { x: site.x, z: site.z, y: groundHeight(site.x, site.z) - .08, s: 1.9, sy: 1, yaw: rand() * 6.283, tilt: 0, tint: shade(.06) };
+    const kind = /주목/.test(site.label) ? 'yew' : 'pine', item = { x: site.x, z: site.z, y: groundHeight(site.x, site.z) - .08, s: 1.9, sy: 1, yaw: rand() * 6.283, tilt: 0, tint: shade(.06), keep: true };
     (lists[kind] ||= []).push(item);
     (lists[`${kind}Low`] ||= []).push(item);
     tile.colliders.push({ x: site.x, z: site.z, r: TRUNK[kind] * 1.9, cam: CANOPY[kind] * 1.9 });
@@ -3402,7 +3507,38 @@ function* plantTile(tile) {
     }
     yield;
   }
-  addPlants(tile, lists);
+  addPlants(tile, course.winter ? winterize(tile, lists) : lists);
+}
+
+// 겨울 코스: 초록 잎 나무는 다섯에 하나만 남기고(잎 지는 나무였다면 소나무로 바꾼다), 나머지는 잎 진 나무로, 그 절반은 가지에 눈이 쌓인 나무로 한다.
+// 꽃은 절반, 풀과 덤불은 열에 셋만 남기고, 바위와 눈 덮인 구간의 계단·데크에는 눈을 얹는다
+const EVERGREEN = new Set(['pine', 'koreanPine', 'fir', 'yew', 'gusang', 'youngFir']);
+const GROUND_COVER = new Set(['grassThin', 'grassBroad', 'grassDry', 'silver', 'sedge', 'fern', 'butterbur', 'solomon', 'bamboo', 'bush', 'clover']);
+const SNOW_CAPPED = new Set(['rockA', 'rockB', 'rockC', 'pebble']);
+const SNOW_PATH = new Set(['stepLog', 'stepStone', 'plank', 'post']);
+const winterName = (kind, variant) => kind.replace(/(Low|Far)?$/, end => variant + end);
+const winterRoll = item => hash3(Math.round(item.x * 10), Math.round(item.z * 10), 17);
+function winterize(tile, lists) {
+  const out = {}, add = (kind, item) => (out[kind] ||= []).push(item);
+  const snowyPath = item => { const hit = nearest(item.x, item.z, 4); return !hit || trail.snow[hit.i] > .5; };
+  for (const [kind, list] of Object.entries(lists)) {
+    const base = kind.replace(/(Low|Far)$/, '');
+    for (const item of list) {
+      if (item.matrix) { add(kind, item); continue; }
+      const roll = winterRoll(item);
+      if (TREES[base] || base.startsWith('young')) {
+        if (item.keep) add(kind, item);
+        else if (roll < .2) add(EVERGREEN.has(base) ? kind : base.startsWith('young') ? 'youngFir' : kind.replace(base, 'pine'), item);
+        else add(winterName(kind, roll < .6 ? 'Bare' : 'Snow'), item);
+      } else if (GROUND_COVER.has(kind)) { if (roll < .3) add(kind, item); }
+      else if (kind.startsWith('flora_')) { if (roll < .5) add(kind, item); }
+      else if (SNOW_CAPPED.has(kind)) add(winterName(kind, 'Snow'), item);
+      else if (SNOW_PATH.has(kind)) add(snowyPath(item) ? winterName(kind, 'Snow') : kind, item);
+      else add(kind, item);
+    }
+  }
+  tile.flowers = tile.flowers.filter(flower => winterRoll(flower) < .5);
+  return out;
 }
 
 function* buildTile(tile) {
@@ -3625,13 +3761,75 @@ function rippleTexture() {
   t.repeat.set(7, 7);
   return t;
 }
+// 호수 물결: 정수 파수의 물결을 겹쳐 이음매 없이 되풀이되는 수면 기울기 지도를 만든다(빨강·초록 = 동서·남북 기울기).
+// 예전 잔물결 그림(128칸)보다 칸이 16배 많고, 셰이더에서 크기가 다른 세 겹으로 겹쳐 쓴다
+let waveMap = null;
+function waveTexture(size = 512) {
+  const waves = [], tau = Math.PI * 2;
+  for (let i = 0; i < 34; i++) {
+    const a = hash3(i, 5, 1) * tau, k = 2 + Math.floor(hash3(i, 6, 1) ** 2 * 40), kx = Math.round(Math.cos(a) * k), kz = Math.round(Math.sin(a) * k);
+    if (kx || kz) waves.push([kx, kz, 1 / Math.hypot(kx, kz) ** 1.15, hash3(i, 7, 1) * tau]);
+  }
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    let gx = 0, gz = 0;
+    for (const [kx, kz, amp, phase] of waves) {
+      const c = Math.cos(tau * (kx * x + kz * y) / size + phase) * amp;
+      gx += c * kx;
+      gz += c * kz;
+    }
+    const at = (y * size + x) * 4;
+    data[at] = clamp(128 + gx * 14, 0, 255);
+    data[at + 1] = clamp(128 + gz * 14, 0, 255);
+    data[at + 2] = data[at + 3] = 255;
+  }
+  const t = new THREE.DataTexture(data, size, size);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.anisotropy = 8;
+  t.needsUpdate = true;
+  return t;
+}
+// 해의 방향을 그리는 카메라 기준으로 바꿔 둔다. 호수마다 그리기 직전에 맞춘다
+const sunView = { value: new THREE.Vector3() };
+function aimSunGlint(renderer, scene, cam) { sunView.value.copy(SUN).transformDirection(cam.matrixWorldInverse); }
+function waterMaterial(params, size = 1) {
+  waveMap ??= waveTexture();
+  const m = new THREE.MeshPhongMaterial({ specular: '#2a3236', shininess: 140, ...params });
+  m.onBeforeCompile = shader => {
+    Object.assign(shader.uniforms, { uWave: { value: waveMap }, uTime: time, uSunView: sunView, uSky: { value: new THREE.Color('#a9c8dc') }, uWaveSize: { value: size } });
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vWaterXZ;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWaterXZ = (modelMatrix * vec4(transformed, 1.0)).xz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uWave; uniform float uTime; uniform vec3 uSunView; uniform vec3 uSky; uniform float uWaveSize; varying vec2 vWaterXZ;')
+      .replace('#include <normal_fragment_maps>', `
+        // 큰 물결, 잔물결, 아주 잔 물살 세 겹이 서로 다른 방향으로 흐른다
+        vec2 wa = texture2D(uWave, vWaterXZ / (31.0 * uWaveSize) + vec2(uTime * .009, uTime * .005)).rg * 2.0 - 1.0;
+        vec2 wb = texture2D(uWave, vWaterXZ / (7.3 * uWaveSize) + vec2(-uTime * .021, uTime * .017)).rg * 2.0 - 1.0;
+        vec2 wc = texture2D(uWave, vWaterXZ / (1.6 * uWaveSize) + vec2(uTime * .047, -uTime * .039)).rg * 2.0 - 1.0;
+        vec2 tilt = wa * .16 + wb * .11 + wc * .07;
+        normal = normalize((viewMatrix * vec4(-tilt.x, 1.0, -tilt.y, 0.0)).xyz);`)
+      .replace('#include <opaque_fragment>', `{
+          // 비스듬히 볼수록 하늘이 비치고, 해가 비치는 쪽에는 물결마다 햇빛이 반짝인다
+          vec3 toEye = normalize(vViewPosition);
+          float fresnel = .03 + .97 * pow(1.0 - max(dot(normal, toEye), 0.0), 5.0);
+          float sun = max(dot(reflect(-toEye, normal), uSunView), 0.0);
+          outgoingLight = mix(outgoingLight, uSky, clamp(fresnel * .8, 0.0, .85)) + vec3(1.0, .93, .78) * (pow(sun, 1400.0) * 9.0 + pow(sun, 120.0) * .5 + pow(sun, 12.0) * .05);
+        }
+        #include <opaque_fragment>`);
+  };
+  m.customProgramCacheKey = () => 'lake-water';
+  return m;
+}
 function addLake(tile, x, y, z, radius) {
-  rippleMap ??= rippleTexture();
   const geo = new THREE.CircleGeometry(radius, 56).rotateX(-Math.PI / 2);
-  const mat = new THREE.MeshLambertMaterial({ color: '#4f8aa6', emissive: '#1b3a48', bumpMap: rippleMap, bumpScale: .8 });
+  const mat = waterMaterial({ color: '#4f8aa6', emissive: '#16323e' });
   const lake = new THREE.Mesh(geo, mat);
   lake.position.set(x, y, z);
-  lake.onBeforeRender = () => rippleMap.offset.set(time.value * .012, time.value * .007);
+  lake.onBeforeRender = aimSunGlint;
   tile.group.add(lake);
   tile.owned.push(geo, mat);
 }
@@ -3650,12 +3848,28 @@ function strewRocks(tile, spots, material = summitRock) {
   tile.owned.push(rocks);
 }
 // 크기가 작아지며 쌓아 올린 돌탑. rows: [돌 수, 반지름, 돌 크기]
+// 돌탑의 높이와 너비는 그대로 두고 돌만 원래의 40~70% 크기로 잘게 다시 쌓는다.
+// 같은 크기를 채우려면 층마다 돌이 더 들어가고 층 수도 늘어난다
+function finerStones(rows) {
+  const profile = [];
+  let top = 0;
+  for (const [, radius, size] of rows) { profile.push([top, radius, size]); top += size * .62; }
+  const out = [];
+  for (let h = 0; h < top - .03;) {
+    const k = profile.findIndex(p => p[0] > h), a = profile[Math.max(0, (k < 0 ? profile.length : k) - 1)], b = profile[k < 0 ? profile.length - 1 : k];
+    const t = b[0] > a[0] ? clamp((h - a[0]) / (b[0] - a[0]), 0, 1) : 0, radius = lerp(a[1], b[1], t), size = lerp(a[2], b[2], t) * .55;
+    out.push([radius < .05 ? 1 : Math.max(3, Math.round(6.283 * radius / (size * 1.37))), radius, size, true]);
+    h += size * .62;
+  }
+  return out;
+}
 function stackStones(tile, x, z, rows) {
   const stack = new THREE.InstancedMesh(cairnStone, summitRock, rows.reduce((sum, row) => sum + row[0], 0)), one = new THREE.Object3D();
   let at = 0, y = .12;
-  for (const [count, radius, size] of rows) {
+  for (const [count, radius, size, fine] of rows) {
     for (let i = 0; i < count; i++) {
-      const a = i / count * 6.28 + rng() * .4, s = size * (.85 + rng() * .3);
+      // 잘게 쌓는 돌은 크기 차이를 더 두어 원래 돌의 40~70%가 되게 한다
+      const a = i / count * 6.28 + rng() * .4, s = size * (fine ? .73 + rng() * .54 : .85 + rng() * .3);
       one.position.set(Math.cos(a) * radius, y + rng() * .05, Math.sin(a) * radius);
       one.rotation.set(rng() * .3, rng() * 6, rng() * .3);
       one.scale.set(s, s, s);
@@ -3692,38 +3906,39 @@ function earGeometry(tall, wide, seed, pointed) {
 const SUMMIT_SPOTS = {
   // 실제 백록담처럼 큰 분화구 그릇: 풀밭 바닥, 치우친 작은 호수, 앞쪽 현무암 너덜, 맞은편의 높은 벽
   한라산(e) {
-    const R = 232, depth = 94, cx = e.x + e.tx * (R - 22), cz = e.z + e.tz * (R - 22), farSide = Math.atan2(e.tx, e.tz), nearSide = farSide + Math.PI;
-    const base = e.y - depth, flat = R * .46, water = base + 30;
+    // 예전 크기(반지름 232 m)보다 넓이를 8배로 키웠다. K는 지름이 커진 비율이다
+    const K = Math.SQRT2 * 2, R = 232 * K, depth = 210, cx = e.x + e.tx * (R - 22), cz = e.z + e.tz * (R - 22), farSide = Math.atan2(e.tx, e.tz), nearSide = farSide + Math.PI;
+    const base = e.y - depth, flat = R * .46, water = base + depth * .5;
     const rimAt = a => {
       const fromNear = Math.abs(angleGap(a, nearSide));
-      return e.y + Math.max(0, Math.cos(a - farSide - .5)) ** 2 * 34 + noise2(Math.cos(a) * 2.6 + 3, Math.sin(a) * 2.6) * 10 * smooth(.25, 1, fromNear);
+      return e.y + Math.max(0, Math.cos(a - farSide - .5)) ** 2 * 34 * K + noise2(Math.cos(a) * 2.6 + 3, Math.sin(a) * 2.6) * (10 + 14 * smooth(.6, 1.4, fromNear)) * smooth(.25, 1, fromNear);
     };
     const padX = e.x - e.tx * 5, padZ = e.z - e.tz * 5;
     const shape = (x, z, h) => lerp(e.y, crater(x, z, h), smooth(5, 13, Math.hypot(x - padX, z - padZ)));
     const crater = (x, z, h) => {
       const dx = x - cx, dz = z - cz, d = Math.hypot(dx, dz);
-      if (d > R + 130) return h;
+      if (d > R + 130 * K) return h;
       const a = Math.atan2(dx, dz), rim = rimAt(a);
-      if (d > R) return lerp(rim - (d - R) * .45, h, smooth(R + 8, R + 130, d));
+      if (d > R) return lerp(rim - (d - R) * .45, h, smooth(R + 8, R + 130 * K, d));
       const s = clamp((d - flat) / (R - flat), 0, 1);
-      return base + (rim - base) * s ** 1.5 + noise2(x * .028, z * .028) * 4 * s + noise2(x * .09, z * .09) * .7;
+      return base + (rim - base) * s ** 1.5 + noise2(x * .01, z * .01) * 11 * s + noise2(x * .028, z * .028) * 4 * s + noise2(x * .09, z * .09) * .7;
     };
     return {
       stone: { ahead: -2, side: 3.4 },
       noCairn: true,
       panoPitch: -.24,
       shape,
-      sunk: (x, z) => 18 * (1 - smooth(R + 14, R + 60, Math.hypot(x - cx, z - cz))),
+      sunk: (x, z) => 18 * (1 - smooth(R + 6, R + 36, Math.hypot(x - cx, z - cz))),
       clear: (x, z) => Math.hypot(x - cx, z - cz) < R + 34,
-      bare: (x, z) => 1 - smooth(R - 6, R + 40, Math.hypot(x - cx, z - cz)),
+      bare: (x, z) => 1 - smooth(R - 6, R + 40 * K, Math.hypot(x - cx, z - cz)),
       build(tile) {
-        const rings = 110, around = 360, P = [], C = [], U = [], I = [], color = new THREE.Color();
+        const rings = 220, around = 640, P = [], C = [], U = [], I = [], color = new THREE.Color();
         for (let r = 0; r <= rings; r++) for (let q = 0; q <= around; q++) {
-          // 등산로가 들어오는 쪽에 점을 몰아 길 가장자리가 매끈하게 끊어지게 한다
-          const t = q / around * 2 - 1, d = (R + 64) * (r / rings) ** .9, a = nearSide + 3.14159 * (t * .4 + t * t * t * .6), x = cx + Math.sin(a) * d, z = cz + Math.cos(a) * d, onPath = nearest(x, z, 6), ground = groundHeight(x, z);
+          // 등산로가 들어오는 쪽에 점을 몰아 길 가장자리가 매끈하게 끊어지게 한다. 바깥 비탈은 지형 타일이 그리므로 가장자리 바로 밖까지만 덮는다
+          const t = q / around * 2 - 1, d = (R + 40) * (r / rings) ** .9, a = nearSide + 3.14159 * (t * .4 + t * t * t * .6), x = cx + Math.sin(a) * d, z = cz + Math.cos(a) * d, onPath = nearest(x, z, 6), ground = groundHeight(x, z);
           P.push(x, ground + .28 + .9 * (1 - smooth(0, 10, Math.abs(d - R))) * (onPath ? smooth(2, 6, onPath.d) : 1), z);
           U.push(x / 15, z / 15);
-          const s = clamp((d - flat) / (R - flat), 0, 1), blot = noise2(x * .017, z * .017), fine = noise2(x * .08, z * .08), gully = Math.abs(Math.sin(a * 17 + blot * 3)), near = 1 - smooth(.5, 1.25, Math.abs(angleGap(a, nearSide)));
+          const s = clamp((d - flat) / (R - flat), 0, 1), blot = noise2(x * .017, z * .017), fine = noise2(x * .03, z * .03), gully = Math.abs(Math.sin(a * 17 + blot * 3)), near = 1 - smooth(.5, 1.25, Math.abs(angleGap(a, nearSide)));
           color.set('#9ba35c');
           shade(color, '#b9a266', smooth(-.1, .5, blot) * .7);
           shade(color, '#7f8c49', smooth(.1, .6, fine) * .5);
@@ -3739,7 +3954,9 @@ const SUMMIT_SPOTS = {
           // 물가에는 젖은 흙이 띠를 이룬다
           shade(color, '#8a6650', smooth(12, 3, ground - water) * .75);
           shade(color, '#5a4a40', smooth(3.5, 1, ground - water));
-          C.push(color.r, color.g, color.b, (1 - smooth(R + 30, R + 62, d)) * (onPath ? smooth(1.5, 3.6, onPath.d) : 1) * smooth(6, 11, Math.hypot(x - padX, z - padZ)));
+          // 겨울 코스: 분화구 바닥과 비탈이 눈에 덮이고, 물가와 가파른 벽만 드러난다
+          if (course.winter) shade(color, '#e4e9ee', .94 * smooth(1.5, 6, ground - water) * (1 - .5 * smooth(.72, .98, s)) * (.78 + .22 * smooth(-.5, .5, blot)));
+          C.push(color.r, color.g, color.b, (1 - smooth(R + 8, R + 30, d)) * (onPath ? smooth(1.5, 3.6, onPath.d) : 1) * smooth(6, 11, Math.hypot(x - padX, z - padZ)));
         }
         for (let r = 0; r < rings; r++) for (let q = 0; q < around; q++) {
           const a0 = r * (around + 1) + q, b0 = a0 + 1, d0 = a0 + around + 1, e0 = d0 + 1;
@@ -3757,8 +3974,8 @@ const SUMMIT_SPOTS = {
         bowl.receiveShadow = true;
         tile.group.add(bowl);
         tile.owned.push(g, bowlMat);
-        // 호수: 분화구를 가득 채운다
-        const LP = [], LC = [], LU = [], LI = [], deep = new THREE.Color('#2b6274'), shallow = new THREE.Color('#5f9088'), spokes = 120, bands = 26, reachR = flat + (R - flat) * .62;
+        // 호수: 분화구를 가득 채운다. 물가 아래까지 넉넉히 펼쳐 둔다
+        const LP = [], LC = [], LU = [], LI = [], deep = new THREE.Color('#2b6274'), shallow = new THREE.Color('#5f9088'), spokes = 220, bands = 44, reachR = flat + (R - flat) * .8;
         for (let ring = 0; ring <= bands; ring++) for (let i = 0; i < spokes; i++) {
           const a = i / spokes * 6.28318, k = reachR * ring / bands, x = cx + Math.sin(a) * k, z = cz + Math.cos(a) * k;
           LP.push(x, water, z);
@@ -3776,25 +3993,24 @@ const SUMMIT_SPOTS = {
         lg.setAttribute('uv', new THREE.Float32BufferAttribute(LU, 2));
         lg.setIndex(LI);
         lg.computeVertexNormals();
-        rippleMap ??= rippleTexture();
-        const lakeMat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: '#10242c', bumpMap: rippleMap, bumpScale: .6 });
+        const lakeMat = waterMaterial({ vertexColors: true, emissive: '#0c1f27' });
         const lake = new THREE.Mesh(lg, lakeMat);
-        lake.onBeforeRender = () => rippleMap.offset.set(time.value * .012, time.value * .007);
+        lake.onBeforeRender = aimSunGlint;
         tile.group.add(lake);
         tile.owned.push(lg, lakeMat);
         // 돌: 앞쪽 너덜, 가장자리의 암괴
         const scree = [], outcrop = [];
-        for (let i = 0; i < 900; i++) {
+        for (let i = 0; i < 2400; i++) {
           const a = nearSide + (rng() - .5) * 1.6, d = lerp(flat * .9, R - 3, rng() ** .75), x = cx + Math.sin(a) * d, z = cz + Math.cos(a) * d;
           if (Math.hypot(x - e.x, z - e.z) > 15 && !nearest(x, z, 4) && groundHeight(x, z) > water + 1) scree.push([x, groundHeight(x, z) - .2, z, .35 + rng() ** 2 * 3]);
         }
-        for (let i = 0; i < 90; i++) {
-          const a = rng() * 6.283, d = R + (rng() - .5) * 12, x = cx + Math.sin(a) * d, z = cz + Math.cos(a) * d;
+        for (let i = 0; i < 240; i++) {
+          const a = rng() * 6.283, d = R + (rng() - .5) * 30, x = cx + Math.sin(a) * d, z = cz + Math.cos(a) * d;
           if (Math.hypot(x - e.x, z - e.z) > 18 && !nearest(x, z, 9)) outcrop.push([x, groundHeight(x, z) - .6, z, 1.6 + rng() ** 2 * 5]);
         }
-        for (let i = 0; i < 24; i++) {
+        for (let i = 0; i < 64; i++) {
           const a = farSide + .5 + (rng() - .5) * 1.3, x = cx + Math.sin(a) * R, z = cz + Math.cos(a) * R;
-          outcrop.push([x, groundHeight(x, z) - 3, z, 7 + rng() * 9]);
+          outcrop.push([x, groundHeight(x, z) - 4, z, 10 + rng() * 14]);
         }
         strewRocks(tile, scree, summitDark);
         strewRocks(tile, outcrop, summitDark);
@@ -3911,7 +4127,8 @@ const SUMMIT_SPOTS = {
   },
   // 적상호: 정상 아래 분지에 담긴 큰 산상 호수와 둑
   적상산(e) {
-    const cx = e.x + e.tx * 232, cz = e.z + e.tz * 232, long = 178, wide = 94, level = e.y - 78, spin = Math.atan2(e.tx, e.tz) + 1.45, cosS = Math.cos(spin), sinS = Math.sin(spin);
+    // 예전(긴 반지름 178 m)보다 넓이를 8배로 키웠다. 정상에서 가까운 물가까지의 거리(약 138 m)는 그대로다
+    const K = Math.SQRT2 * 2, long = 178 * K, wide = 94 * K, near = 138, cx = e.x + e.tx * (near + wide), cz = e.z + e.tz * (near + wide), level = e.y - 78, spin = Math.atan2(e.tx, e.tz) + 1.45, cosS = Math.cos(spin), sinS = Math.sin(spin);
     const reach = (x, z) => {
       const dx = x - cx, dz = z - cz, u = (dx * sinS + dz * cosS) / long, v = (dx * cosS - dz * sinS) / wide, a = Math.atan2(v, u);
       return Math.hypot(u, v) * (1 + Math.sin(a * 3 + 1) * .1 + Math.sin(a * 7) * .06);
@@ -3922,22 +4139,21 @@ const SUMMIT_SPOTS = {
       shape(x, z, h) {
         const k = reach(x, z);
         if (k > 2) return h;
-        return lerp(lerp(level - 9, level + 3.5, smooth(.86, 1.02, k)), h, smooth(1.1, 2, k));
+        return lerp(lerp(level - 14, level + 3.5, smooth(.86, 1.02, k)), h, smooth(1.1, 2, k));
       },
       clear(x, z) {
         if (reach(x, z) < 1.18) return true;
         const ax = x - e.x, az = z - e.z, along = ax * e.tx + az * e.tz, side = Math.abs(ax * e.lx + az * e.lz);
-        return along > 3 && along < 210 && side < 12 + along * .34;
+        return along > 3 && along < near + wide * .8 && side < 12 + along * .34;
       },
       build(tile) {
-        const P = [cx, level, cz], I = [];
-        for (let i = 0; i < 96; i++) {
-          const a = i / 96 * 6.28318, u = Math.cos(a), v = Math.sin(a), k = 1.03 / (1 + Math.sin(Math.atan2(v, u) * 3 + 1) * .1 + Math.sin(Math.atan2(v, u) * 7) * .06);
+        const P = [cx, level, cz], I = [], around = 180;
+        for (let i = 0; i < around; i++) {
+          const a = i / around * 6.28318, u = Math.cos(a), v = Math.sin(a), k = 1.03 / (1 + Math.sin(Math.atan2(v, u) * 3 + 1) * .1 + Math.sin(Math.atan2(v, u) * 7) * .06);
           const lx = u * long * k, lz = v * wide * k;
           P.push(cx + lx * sinS + lz * cosS, level, cz + lx * cosS - lz * sinS);
-          I.push(0, 1 + i, 1 + (i + 1) % 96);
+          I.push(0, 1 + i, 1 + (i + 1) % around);
         }
-        rippleMap ??= rippleTexture();
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
         const uv = [];
@@ -3947,14 +4163,14 @@ const SUMMIT_SPOTS = {
         g.computeVertexNormals();
         if (g.attributes.normal.getY(0) < 0) g.index.array.reverse();
         g.computeVertexNormals();
-        const mat = new THREE.MeshLambertMaterial({ color: '#2f6a78', emissive: '#0f2630', bumpMap: rippleMap, bumpScale: .8, side: THREE.DoubleSide });
+        const mat = waterMaterial({ color: '#2f6a78', emissive: '#0f2630', side: THREE.DoubleSide });
         const lake = new THREE.Mesh(g, mat);
-        lake.onBeforeRender = () => rippleMap.offset.set(time.value * .012, time.value * .007);
+        lake.onBeforeRender = aimSunGlint;
         tile.group.add(lake);
         tile.owned.push(g, mat);
         // 물가의 돌 띠, 둑
         const rocks = [];
-        for (let i = 0; i < 150; i++) {
+        for (let i = 0; i < 420; i++) {
           const a = rng() * 6.283, u = Math.cos(a), v = Math.sin(a), lx = u * long * 1.03, lz = v * wide * 1.03, x = cx + lx * sinS + lz * cosS, z = cz + lx * cosS - lz * sinS;
           rocks.push([x, level + .1, z, .6 + rng() * 1.6]);
         }
@@ -4118,7 +4334,7 @@ function addSummit(tile) {
   tile.group.add(summit);
   tile.colliders.push({ x: sx, z: sz, r: 1.6, cam: 0 });
   if (cairnSpot) {
-    stackStones(tile, cairnSpot.x, cairnSpot.z, [[8, .84, .4], [7, .68, .36], [6, .54, .33], [5, .42, .29], [4, .3, .25], [3, .18, .21], [1, 0, .17]]);
+    stackStones(tile, cairnSpot.x, cairnSpot.z, finerStones([[8, .84, .4], [7, .68, .36], [6, .54, .33], [5, .42, .29], [4, .3, .25], [3, .18, .21], [1, 0, .17]]));
     tile.colliders.push({ x: cairnSpot.x, z: cairnSpot.z, r: 1.1, cam: 0 });
   }
   summitSpot?.build?.(tile);
@@ -4132,6 +4348,7 @@ const SITE_RULES = [
   ['temple', /[가-힣]사$|[가-힣]암$|암자$/],
   ['wall', /산성|성터|성곽|성문|[동서남북]문(지|터)?$/],
   ['cairn', /돌탑/],
+  ['sangu', /산꾸/],
   ['pagoda', /[가-힣0-9]탑$/],
   ['stupa', /부도/],
   ['statue', /마애|석불|불상|와불|여래/],
@@ -4324,8 +4541,17 @@ function readySites() {
     points[points.length - 2].w = 3;
     const ridge = { x: head.x + dx * 6.5, z: head.z + dz * 6.5, y: head.y + tall, flat: 2.5, out: 8.5, clear: 7 };
     markEdit(ridge.x, ridge.z, ridge.out, ridge);
+    // 폭포는 물길 머리에 서므로, 안내와 표지판과 자동 멈춤도 폭포가 보이는 그 자리로 옮긴다
+    let near = Math.round(poi.s / t.ds), best = Infinity;
+    for (let i = Math.max(0, Math.round(stream.a / t.ds) - 12); i <= Math.min(t.n, Math.round(stream.b / t.ds) + 12); i++) {
+      const d = Math.hypot(t.xs[i] - head.x, t.zs[i] - head.z);
+      if (d < best) { best = d; near = i; }
+    }
+    poi.s = near * t.ds;
     t.sites.push({ kind: 'fall', s: poi.s, label: poi.label, x: head.x, z: head.z, y: head.y, dx, dz, tall });
   }
+  t.pois.sort((p, q) => p.s - q.s);
+  t.named.sort((p, q) => p.s - q.s);
   addStreamMeshes(t.streams);
   // 나머지 장소는 길 옆에 자리를 잡고 땅을 다진다
   const seat = (kind, s, label, made = false) => {
@@ -4741,6 +4967,7 @@ const MEET = {
   pavilion: { kicker: '정자', text: '정자 마루에 걸터앉아 쉽니다. 10초마다 체력이 1씩 오릅니다.', hint: '정자가 있어요. 마루 앞으로 가면 앉아서 쉽니다.' },
   cairn: { kicker: '돌탑', look: true, text: '오가는 사람들이 소원을 빌며 하나씩 얹은 돌이 사람 키보다 높이 쌓였습니다.' },
   sangu: { kicker: '산꾸', look: true, text: '누군가 바위벽에 단풍잎과 나뭇잎을 붙여 산을 꾸며 놓았습니다.' },
+  fall: { kicker: '폭포', look: true, energy: 0, reach: 24, text: '계곡 물이 바위 턱을 넘어 하얗게 쏟아집니다.' },
 };
 const DRINK_SECONDS = 4.6, REST_TICK = 10, SPRING_GAIN = 5;
 const amen = { visits: new Set(), hinted: new Set(), hold: false, act: null, site: null, approach: null, rootY: 0, yaw: 0, clock: 0, flowers: 0, energy: 0, resume: false, photo: null };
@@ -4810,6 +5037,13 @@ const meetPoint = new THREE.Vector3();
 function onScreen(x, y, z) {
   meetPoint.set(x, y, z).project(camera);
   return meetPoint.z < 1 && Math.abs(meetPoint.x) < .86 && Math.abs(meetPoint.y) < .86;
+}
+// 멈춘 자리의 볼거리가 등산객 너머로 보이도록 카메라를 돌린다. 가는 방향도 조금 함께 보이게 비스듬히 둔다
+function faceSite(site) {
+  const here = trailAt(player.s), dx = site.x - player.x, dz = site.z - player.z, l = Math.hypot(dx, dz) || 1;
+  const vx = dx / l + here.tx * .9, vz = dz / l + here.tz * .9;
+  cam.face = Math.atan2(-vx, -vz);
+  cam.hold = 4;
 }
 // 앉거나 마실 때 서는 자리: 등산로 쪽에서 다가간다
 function approachOf(site) {
@@ -4928,11 +5162,13 @@ function stepAmenities(dt) {
     if (!m || amen.visits.has(site) || Math.abs(site.s - player.s) > 24) continue;
     const gap = Math.hypot(site.x - player.x, site.z - player.z);
     if (m.look) {
-      if (gap < 14 && onScreen(site.x, (site.y ?? player.y) + 1, site.z)) {
+      if (Math.abs(site.s - player.s) < 1.2 && gap < (m.reach ?? 10)) {
         amen.visits.add(site);
-        gainEnergy(1);
+        const gain = m.energy !== 0;
+        if (gain) gainEnergy(1);
         pauseAuto();
-        showMeet({ kicker: m.kicker, title: site.label, text: m.text, gain: '기운 +1', star: true });
+        faceSite(site);
+        showMeet({ kicker: m.kicker, title: site.label, text: m.text, gain: gain ? '기운 +1' : '', star: gain });
       }
       continue;
     }
@@ -5263,7 +5499,7 @@ Object.assign(SITE_BUILD, {
   cairn(tile, site) {
     siteParts();
     // 사람 키보다 조금 높게, 아래가 넓고 위로 갈수록 좁게 쌓는다
-    stackStones(tile, site.x, site.z, [[10, 1, .46], [9, .88, .42], [8, .78, .4], [8, .68, .37], [7, .6, .34], [6, .52, .31], [6, .44, .29], [4, .3, .24], [3, .22, .21], [2, .13, .18], [1, 0, .16]]);
+    stackStones(tile, site.x, site.z, finerStones([[10, 1, .46], [9, .88, .42], [8, .78, .4], [8, .68, .37], [7, .6, .34], [6, .52, .31], [6, .44, .29], [4, .3, .24], [3, .22, .21], [2, .13, .18], [1, 0, .16]]));
     const ring = [];
     for (let i = 0; i < 12; i++) { const a = i * .52 + hash3(site.s, i, 2), r = 1.3 + hash3(site.s, i, 3) * .5, x = site.x + Math.sin(a) * r, z = site.z + Math.cos(a) * r; ring.push([x, groundHeight(x, z) + .02, z, .12 + hash3(site.s, i, 4) * .16]); }
     strewRocks(tile, ring);
@@ -7156,6 +7392,7 @@ function clearWild() {
 
 /* ---------- 소리: 전부 Web Audio로 합성한다 ---------- */
 function stepSurface() {
+  if (course.winter && (player.off > 2.4 || trail.snow[player.index] > .5)) return 'snow';
   if (player.off > 2.4) {
     const splat = trail.splat;
     const i = player.index;
@@ -7219,6 +7456,8 @@ class Sound {
       wood: d => { this.thump(d, sr, 165 + Math.random() * 45, 28, .62); this.thump(d, sr, 340 + Math.random() * 90, 46, .34); this.grains(d, sr, { count: 14, spread: .3, amp: .12, shortest: .001, longest: .002 }); },
       leaves: d => { this.thump(d, sr, 72, 40, .3); this.grains(d, sr, { count: 240, spread: 1, amp: .2, shortest: .002, longest: .007 }); },
       grass: d => { this.thump(d, sr, 70, 42, .26); this.grains(d, sr, { count: 150, spread: 1, amp: .1, shortest: .004, longest: .012 }); },
+      // 눈: 낮게 눌리는 소리 위로 잘게 부서지는 뽀드득 소리가 길게 이어진다
+      snow: d => { this.thump(d, sr, 58, 26, .2); this.grains(d, sr, { count: 520, spread: .9, amp: .3, shortest: .0005, longest: .0018 }); this.grains(d, sr, { count: 70, spread: .55, amp: .42, shortest: .002, longest: .006 }); },
     };
     for (const [name, build] of Object.entries(recipe)) {
       this.steps[name] = [0, 1, 2, 3].map(() => {
@@ -7237,7 +7476,7 @@ class Sound {
     source.playbackRate.value = .88 + Math.random() * .26;
     const low = ctx.createBiquadFilter();
     low.type = 'lowpass';
-    low.frequency.value = { dirt: 2200, gravel: 5200, stone: 4200, wood: 2600, leaves: 5600, grass: 3600 }[kind];
+    low.frequency.value = { dirt: 2200, gravel: 5200, stone: 4200, wood: 2600, leaves: 5600, grass: 3600, snow: 4600 }[kind];
     const high = ctx.createBiquadFilter();
     high.type = 'highpass'; high.frequency.value = 90;
     const gain = ctx.createGain();
@@ -7755,6 +7994,7 @@ function bindControls() {
     } else if (drag) {
       if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 7) drag.moved = true;
       if (drag.moved) {
+        cam.face = undefined;
         cam.yaw -= (e.clientX - drag.x) * .0062;
         cam.pitch = clamp(cam.pitch + (e.clientY - drag.y) * .0042, .06, 1.15);
         cam.hold = 2.2;
@@ -7815,7 +8055,8 @@ function bindControls() {
   $('flora-close').addEventListener('click', () => { $('flora').hidden = true; });
   $('flower-tag').addEventListener('click', () => { if (flowerNear) openFlora(flowerNear.id); });
   addEventListener('keyup', e => { if (e.code === 'Escape') $('flora').hidden = true; });
-  $('start').addEventListener('click', enterHike);
+  $('start').addEventListener('click', () => enterHike(pickedMountain?.id));
+  $('trial').addEventListener('click', () => enterHike(TRIAL.id));
   $('auto').addEventListener('click', e => { toggleAuto(); if (e.detail) e.currentTarget.blur(); });
   $('panorama').addEventListener('click', e => { togglePanorama(); if (e.detail) e.currentTarget.blur(); });
   $('pano-stop').addEventListener('click', () => { pano.leaving = true; });
@@ -7879,6 +8120,8 @@ function placeEveryone(stamina) {
 function beginHike(stamina) {
   if (pano.on) endPanorama();
   placeEveryone(stamina);
+  // 체험 코스는 10분이라 산짐승과 신비한 동물이 일찍 나온다
+  if (course.trial) Object.assign(wildClock, { small: 20, big: 55, myth: 95 });
   walkTo(null);
   cam.yaw = player.yaw + Math.PI;
   cam.pitch = .17;
@@ -7929,11 +8172,11 @@ function leaveIntro() {
   $('intro-video').hidden = true;
   $('intro-video').pause();
 }
-async function enterHike() {
-  if (!pickedMountain) return;
+async function enterHike(id) {
+  if (!id) return;
   sound.start();
   try {
-    if (course?.id !== pickedMountain.id) await openCourse(pickedMountain.id);
+    if (course?.id !== id) await openCourse(id);
   } catch (error) {
     console.error(error);
     showLoading('코스를 불러오지 못했습니다. 새로고침한 뒤 다시 골라 주세요.');
@@ -7958,6 +8201,9 @@ async function backToStart() {
 
 /* ---------- 코스 열기 ---------- */
 let catalog = [], openToken = 0, bundle = null;
+// 한라산 관음사 코스를 정상을 기준으로 줄인 10분짜리 체험 코스(tools/build_trial.py로 만든다). 지도에는 없다
+const TRIAL = { id: 'trial', name: '한라산', label: '한라산 체험 코스', summit: '한라산 백록담', top: 1946 };
+const courseRow = id => catalog.find(row => row.id === id) ?? (id === TRIAL.id ? TRIAL : null);
 
 // 파일을 더블클릭해 열면 브라우저가 fetch를 막으므로, 스크립트로 묶어 둔 자료를 대신 읽는다
 function loadBundle() {
@@ -7995,14 +8241,14 @@ function clearWorld() {
 }
 async function openCourse(id) {
   const token = ++openToken;
-  const entry = catalog.find(row => row.id === id);
+  const entry = courseRow(id);
   state.mode = 'loading';
-  showLoading(`${entry.name} 길을 불러오는 중`);
+  showLoading(`${entry.label ?? entry.name} 길을 불러오는 중`);
   leaveIntro();
   const data = await readJson(`courses/${id}.json`);
   if (token !== openToken) return;
   clearWorld();
-  course = { ...data, id, seed: Number(id.replace(/\D/g, '')) * 7919 || 1, place: data.summit, summit: tidySummit(data.summit, data.name) };
+  course = { ...data, id, seed: data.seed ?? (Number(id.replace(/\D/g, '')) * 7919 || 1), place: data.summit, summit: tidySummit(data.summit, data.name) };
   trail = buildTrail(data);
   describeTrail(data);
   drainPerMeter = RULES.courseDrain / (trail.grade.reduce((sum, g) => sum + gradeDrain(g), 0) * trail.ds);
@@ -8013,7 +8259,7 @@ async function openCourse(id) {
   buildBackdrop();
   buildCourseMap();
   placeEveryone(START_STAMINA);
-  await settleWorld(`${entry.name} 풍경을 만드는 중`);
+  await settleWorld(`${entry.label ?? entry.name} 풍경을 만드는 중`);
   if (token !== openToken) return;
   state.mode = 'ready';
 }
@@ -8107,7 +8353,7 @@ function flowerShelf(body) {
   body.append(grid);
 }
 function stoneShelf(body) {
-  const done = catalog.filter(row => record.stones[row.id]).sort((a, b) => (record.stones[a.id].at < record.stones[b.id].at ? 1 : -1));
+  const done = [...catalog, TRIAL].filter(row => record.stones[row.id]).sort((a, b) => (record.stones[a.id].at < record.stones[b.id].at ? 1 : -1));
   const left = catalog.filter(row => !record.stones[row.id]);
   bookNote(body, done.length ? '자동 등산으로 정상에 오르면 비석 곁에서 찍은 기념사진이 담깁니다. 파노라마 다시 보기로 그 정상의 풍경을 다시 볼 수 있습니다.' : '아직 오른 정상이 없습니다. 정상에 도착하면 비석이 여기에 담깁니다.');
   if (done.length) {
@@ -8124,7 +8370,7 @@ function stoneShelf(body) {
         if (state.mode === 'hike' && !state.finished && !replay.dataset.sure) { replay.dataset.sure = '1'; replay.textContent = '지금 등산을 멈추고 보기'; return; }
         replaySummit(row.id);
       });
-      item.append(stonePhotoOr(face, row), node('p', 'stone-meta', `${row.name} · 첫 등정 ${stone.at}\n최고 기록 ${clockText(stone.best)} · ${stone.times}회`), replay);
+      item.append(stonePhotoOr(face, row), node('p', 'stone-meta', `${row.label ?? row.name} · 첫 등정 ${stone.at}\n최고 기록 ${clockText(stone.best)} · ${stone.times}회`), replay);
       grid.append(item);
     }
     body.append(grid);
@@ -8607,12 +8853,13 @@ function pickMountain(row) {
   const { main } = summitWords(row.summit, row.name);
   $('peak-name').textContent = `${row.name} · ${main}`;
   $('peak-facts').textContent = `해발 ${row.top} m · 코스 ${(row.length / 1000).toFixed(1)} km · 오르막 ${row.gain} m`;
-  $('peak-card').classList.remove('pop');
-  void $('peak-card').offsetWidth;
-  $('peak-card').classList.add('pop');
+  // 산을 고르면 이 카드가 그 산의 시작 버튼이 된다
   const start = $('start');
   start.disabled = false;
-  start.textContent = `${row.name} 등산 시작`;
+  start.classList.remove('pop');
+  void start.offsetWidth;
+  start.classList.add('pop');
+  $('go-row').classList.add('picked');
 }
 function buildMap() {
   const svg = $('korea'), sea = svgNode('g', { class: 'map-sea' }), land = svgNode('g'), pins = svgNode('g');
@@ -8725,6 +8972,10 @@ function stepPanorama(dt) {
 function updateCamera(dt) {
   if (pano.on) { stepPanorama(dt); return; }
   cam.hold = Math.max(0, cam.hold - dt);
+  if (cam.face !== undefined) {
+    if (cam.hold > 0) cam.yaw += angleGap(cam.yaw, cam.face) * (1 - Math.exp(-dt * 3.2));
+    else cam.face = undefined;
+  }
   const p = player.model.root.position;
   // 카메라는 발밑 높이 대신 매끈한 길 높이를 따라가 계단에서 덜덜거리지 않는다
   // 길 높이는 이미 매끈하므로 늦추지 않고 그대로 쓴다. 늦추면 프레임 간격에 따라 시선 높이가 출렁인다
@@ -8881,7 +9132,7 @@ function checkPlaces() {
   const type = placeType(poi);
   $('place-kind').textContent = type;
   $('place-name').textContent = poi.label;
-  $('place-info').textContent = `${course.name} 등산로 입구에서 ${km}, 해발 ${Math.round(trailAt(poi.s).y)} m 지점의 ${type}입니다.`;
+  $('place-info').textContent = course.trial ? `${course.label}에서 만나는 ${type}입니다. 실제 한라산보다 거리와 높이를 줄여 두었습니다.` : `${course.name} 등산로 입구에서 ${km}, 해발 ${Math.round(trailAt(poi.s).y)} m 지점의 ${type}입니다.`;
   setPhoto($('place-photo'), $('place-credit'), photos.places[`${course.name}|${poi.place}`], poi.label);
   $('place').hidden = false;
   placeTimer = performance.now() + 9000;
@@ -9309,7 +9560,7 @@ async function boot() {
   if (!['localhost', '127.0.0.1'].includes(location.hostname)) return;
   window.__hike = {
     state, sound, frameStats, renderer, sunLight, tiles, scene, camera, cam, THREE, kinds: () => kinds, trail: () => trail, course: () => course, player: () => player, npcs: () => npcs,
-    open: id => { const row = catalog.find(item => item.id === id); pickRegion(row.region); pickMountain(row); return openCourse(id); },
+    open: id => { const row = courseRow(id); if (row.region) { pickRegion(row.region); pickMountain(row); } return openCourse(id); },
     look, setLook, pickRegion, pickMountain, regions: MAP_REGIONS, catalog: () => catalog, studio: () => studio,
     teleport(s) { player.reset(player.stamina, s); focus.copy(player.model.root.position); },
     settle() { updateTiles(); while (jobs.length) pumpJobs(1000); },
