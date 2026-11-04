@@ -3747,7 +3747,9 @@ function addSign(tile, poi) {
   board.castShadow = true;
   sign.add(board);
   solid(sign, POST, woodMat, 0, .97, 0);
-  tile.colliders.push({ ...standAt(tile, sign, poi.s, -2.4), r: .2, cam: 0 });
+  // 자동 등산이 멈춰 보여 주는 곳(돌탑, 산꾸, 폭포)의 표지판은 7 m 지나서 세워 멈춘 자리의 시야를 가리지 않는다
+  const at = MEET[siteKind(poi)]?.look ? Math.min(trail.length - 3, poi.s + 7) : poi.s;
+  tile.colliders.push({ ...standAt(tile, sign, at, -2.4), r: .2, cam: 0 });
   if (poi.kind === 'rest') {
     const bench = new THREE.Group();
     solid(bench, BENCH_TOP, woodMat, 0, .44, 0);
@@ -3970,6 +3972,7 @@ const SUMMIT_SPOTS = {
       stone: { ahead: -2, side: 3.4 },
       noCairn: true,
       panoPitch: -.24,
+      view: { x: e.x + e.tx * .3, z: e.z + e.tz * .3, aimX: cx, aimY: water, aimZ: cz },
       shape,
       sunk: (x, z) => 18 * (1 - smooth(R + 6, R + 36, Math.hypot(x - cx, z - cz))),
       clear: (x, z) => Math.hypot(x - cx, z - cz) < R + 34,
@@ -4580,9 +4583,18 @@ function readySites() {
     const stream = streamAt(poi.s);
     if (!stream) continue;
     const { points } = stream, head = points[points.length - 1], next = points[points.length - 4], l = Math.hypot(head.x - next.x, head.z - next.z) || 1, dx = (head.x - next.x) / l, dz = (head.z - next.z) / l, tall = 6.5 + hash3(poi.s, 2, 9) * 4;
+    // 한 물길 머리에는 폭포를 하나만 세운다. 이름이 여럿이면 처음 것만 모형을 갖는다
+    if (t.sites.some(o => o.kind === 'fall' && Math.hypot(o.x - head.x, o.z - head.z) < 1)) continue;
     head.w = 3.2;
     points[points.length - 2].w = 3;
     const ridge = { x: head.x + dx * 6.5, z: head.z + dz * 6.5, y: head.y + tall, flat: 2.5, out: 8.5, clear: 7 };
+    // 솟은 땅이 길에 닿으면 길에서 먼 쪽으로 민다
+    const close = nearest(ridge.x, ridge.z, ridge.out + 4);
+    if (close) {
+      const ax = ridge.x - trail.xs[close.i], az = ridge.z - trail.zs[close.i], l = Math.hypot(ax, az) || 1, push = ridge.out + 4 - close.d;
+      ridge.x += ax / l * push;
+      ridge.z += az / l * push;
+    }
     markEdit(ridge.x, ridge.z, ridge.out, ridge);
     // 폭포는 물길 머리에 서므로, 안내와 표지판과 자동 멈춤도 폭포가 보이는 그 자리로 옮긴다
     let near = Math.round(poi.s / t.ds), best = Infinity;
@@ -4946,11 +4958,17 @@ const SITE_BUILD = {
   fall(tile, site) {
     siteParts();
     const g = new THREE.Group(), { dx, dz, tall } = site, sideX = dz, sideZ = -dx;
-    // 절벽: 큰 바위를 활처럼 쌓고, 가운데로 물이 떨어진다
+    // 절벽: 큰 바위를 활처럼 쌓고, 가운데로 물이 떨어진다.
+    // 폭포가 길 가까이 있으면 활 한쪽 끝이 길에 걸치므로, 길에서 3.6 m 안에 드는 바위는 쌓지 않고 남은 바위는 부딪히게 한다
     for (let i = 0; i < 9; i++) {
       const a = (i - 4) / 4, along = 3.6 + (1 - a * a) * 1.4, wide = a * 6.5, x = dx * along + sideX * wide, z = dz * along + sideZ * wide, rows = Math.ceil(tall / 2.4);
       if (Math.abs(a) < .13) continue;
-      for (let r = 0; r < rows; r++) craggy(g, i + r, x + dx * r * .35, r * 2.2 + .8, z + dz * r * .35, 1.5 + hash3(i, r, 4) * .7, 1.1, i * r);
+      for (let r = 0; r < rows; r++) {
+        const rx = x + dx * r * .35, rz = z + dz * r * .35, size = 1.5 + hash3(i, r, 4) * .7;
+        if (nearest(site.x + rx, site.z + rz, size + 3.6)) continue;
+        craggy(g, i + r, rx, r * 2.2 + .8, rz, size, 1.1, i * r);
+        if (r === 0) tile.colliders.push({ x: site.x + rx, z: site.z + rz, r: size * .9, cam: 0 });
+      }
     }
     const P = [], U = [], I = [], rows = 14;
     for (let r = 0; r <= rows; r++) {
@@ -5285,10 +5303,27 @@ function stepSummitPhoto(dt) {
     flash.classList.add('on');
     sound.shutter?.();
   } else if (shot.phase === 'shown' && shot.clock > .9) {
-    amen.photo = null;
     amen.hold = false;
     player.act = null;
     showFinish(shot.url);
+    const view = course.trial && summitSpot?.view;
+    if (!view) { amen.photo = null; return; }
+    // 체험 코스는 사진을 찍은 뒤 백록담이 잘 보이는 난간 앞으로 걸어가 파노라마를 편다
+    $('finish').hidden = true;
+    Object.assign(shot, { phase: 'view', clock: 0 });
+    walkToPoint(view.x, view.z);
+    marker.visible = false;
+  } else if (shot.phase === 'view') {
+    const view = summitSpot.view, gap = Math.hypot(view.x - player.x, view.z - player.z);
+    if (gap > .5 && state.walkPoint && shot.clock < 12) return;
+    walkTo(null);
+    amen.photo = null;
+    // 호수 한가운데를 바라보고, 호수가 화면에 들어오도록 그만큼 내려다본다
+    const ax = view.aimX - player.x, az = view.aimZ - player.z, eyeY = player.y + 1.62;
+    player.yaw = Math.atan2(ax, az);
+    togglePanorama(true);
+    pano.yaw = player.yaw;
+    pano.pitch = -Math.atan2(eyeY - view.aimY, Math.hypot(ax, az)) - .05;
   }
 }
 const snapCam = new THREE.PerspectiveCamera(38, 4 / 3, .2, 34000);
@@ -7584,13 +7619,13 @@ class Sound {
   }
   setWater(level) {
     this.waterLevel = level;
-    if (this.water) this.water.gain.setTargetAtTime(level * .1, this.ctx.currentTime, .9);
+    if (this.water) this.water.gain.setTargetAtTime(level * .07, this.ctx.currentTime, .9);
   }
   bubbleLoop() {
     setTimeout(() => {
       if (this.audible() && this.waterLevel > .08) {
         const bus = this.ctx.createGain();
-        bus.gain.value = .05 * this.waterLevel;
+        bus.gain.value = .035 * this.waterLevel;
         bus.connect(this.master);
         const f = 320 + Math.random() * 620;
         this.tone(bus, this.ctx.currentTime + .01, .06 + Math.random() * .08, [[0, f], [1, f * 1.7]]);
