@@ -523,7 +523,7 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
     </a>
     <div class="promo-foot">
       <p>한라산 트래킹 코스 오픈기념</p>
-      <button class="go promo-go" id="promo-go" type="button">겨울 한라산 체험코스 오픈</button>
+      <button class="go promo-go" id="promo-go" type="button">겨울 한라산 체험코스 해보기</button>
     </div>
   </div>
 </div>
@@ -5899,7 +5899,8 @@ function buildHikers() {
   player = new Hiker({ name: '나', lane: 0, ...look });
   player.onStep = () => {
     const kind = stepSurface();
-    sound.step(kind, course?.winter ? (kind === 'snow' ? .8 : 1.2) : 1);
+    // 겨울 코스: 눈 밟는 소리는 0.8배, 눈 없는 땅은 1.56배(1.2배에서 30% 더 키웠다)
+    sound.step(kind, course?.winter ? (kind === 'snow' ? .8 : 1.56) : 1);
   };
   npcs = NPC_LOOKS.map(look => new Hiker(look));
   everyone = [player, ...npcs];
