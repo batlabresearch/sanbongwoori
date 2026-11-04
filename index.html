@@ -79,7 +79,11 @@ button { cursor: pointer; }
 .gauge { height: 9px; border-radius: 2px; background: rgba(246, 232, 189, .16); overflow: hidden; }
 .gauge i { display: block; height: 100%; width: 100%; background: var(--moss); transition: width .25s linear, background-color .4s; }
 #profile { width: 100%; height: 58px; display: block; min-width: 0; }
-#course-map { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(100px + env(safe-area-inset-bottom, 0px)); width: 260px; height: 260px; border: 1px solid var(--line); border-radius: 4px; background: var(--shade); }
+#course-map-box { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(100px + env(safe-area-inset-bottom, 0px)); width: 260px; height: 260px; }
+#course-map { display: block; width: 100%; height: 100%; border: 1px solid var(--line); border-radius: 4px; background: var(--shade); }
+/* 축소하면 지금 크기의 1/5로 줄어든다 */
+#course-map-box.small { width: 52px; height: 52px; }
+.map-zoom { position: absolute; right: 0; bottom: calc(100% + 6px); min-height: 30px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; }
 .walk {
   min-height: 46px; padding: 0 15px; border: 0; border-radius: 3px;
   background: var(--ribbon); color: var(--bark); font-weight: 600; font-size: 14px; white-space: nowrap;
@@ -318,7 +322,8 @@ h1 small { margin-left: 9px; font-family: var(--ui); font-weight: 500; font-size
   .volume input { width: 68px; }
   .walk { padding: 0 11px; font-size: 13px; }
   #profile { grid-column: 1 / -1; grid-row: 2; height: 46px; }
-  #course-map { bottom: calc(148px + env(safe-area-inset-bottom, 0px)); width: 150px; height: 150px; }
+  #course-map-box { bottom: calc(148px + env(safe-area-inset-bottom, 0px)); width: 150px; height: 150px; }
+  #course-map-box.small { width: 30px; height: 30px; }
   #toast { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -392,7 +397,7 @@ h1 small { margin-left: 9px; font-family: var(--ui); font-weight: 500; font-size
 #drink.play .drink-gain { animation: gainIn 4.6s ease-out forwards; }
 @keyframes gainIn { 0%, 74% { opacity: 0; transform: translateY(10px); } 82%, 100% { opacity: 1; transform: translateY(0); } }
 .stone-photo { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 3px; background: var(--plank); }
-body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panorama #course-map { visibility: hidden; }
+body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panorama #course-map-box { visibility: hidden; }
 @media (max-width: 660px) {
   #meet { top: calc(118px + env(safe-area-inset-top, 0px)); }
   #rest-end { bottom: calc(160px + env(safe-area-inset-bottom, 0px)); }
@@ -421,7 +426,10 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
     </div>
   </div>
   <div></div>
-  <canvas id="course-map" width="520" height="520" role="img" aria-label="실제 등산 코스 지도와 현재 위치"></canvas>
+  <div id="course-map-box">
+    <canvas id="course-map" width="520" height="520" role="img" aria-label="실제 등산 코스 지도와 현재 위치"></canvas>
+    <button class="tool map-zoom" id="map-zoom" type="button" aria-pressed="false">지도 축소</button>
+  </div>
   <section class="dash" aria-label="등산 현황">
     <div class="stamina">
       <div class="stamina-head">체력 <b id="stamina-value">0</b><span class="energy" title="기운"><svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.4l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.2l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg><b id="energy-value">0</b><span id="energy-pop"></span></span><span class="speed"><b id="speed-value">0</b> m/s</span></div>
@@ -1054,15 +1062,36 @@ function buildStage() {
 
   sky = new THREE.Mesh(new THREE.SphereGeometry(26000, 32, 18), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { uTop: { value: new THREE.Color('#5f9fd6') }, uHorizon: { value: HORIZON }, uSun: { value: SUN } },
+    uniforms: { uTop: { value: new THREE.Color('#5f9fd6') }, uHorizon: { value: HORIZON }, uSun: { value: SUN }, uTime: time, uNoise: { value: cloudNoiseTexture() } },
     vertexShader: `varying vec3 vDir;
       void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform vec3 uTop; uniform vec3 uHorizon; uniform vec3 uSun; varying vec3 vDir;
+    fragmentShader: `uniform vec3 uTop; uniform vec3 uHorizon; uniform vec3 uSun; uniform float uTime; uniform sampler2D uNoise; varying vec3 vDir;
+      // 층마다 돌리고 키워 겹치면 격자 무늬가 드러나지 않는다
+      const mat2 turn = mat2(1.6, 1.2, -1.2, 1.6);
+      float cloud6(vec2 p) { float sum = 0.0, amp = .5; for (int i = 0; i < 6; i++) { sum += amp * texture2D(uNoise, p).r; p = turn * p + vec2(.137, .291); amp *= .5; } return sum / .984; }
+      float cloud3(vec2 p) { float sum = 0.0, amp = .5; for (int i = 0; i < 3; i++) { sum += amp * texture2D(uNoise, p).r; p = turn * p + vec2(.311, .173); amp *= .5; } return sum / .875; }
       void main() {
         vec3 d = normalize(vDir);
         vec3 c = mix(uHorizon, uTop, pow(clamp(d.y, 0.0, 1.0), .55));
         float s = max(dot(d, uSun), 0.0);
         c += vec3(1.0, .93, .78) * (pow(s, 1400.0) * 5.0 + pow(s, 36.0) * .2);
+        // 구름: 높이 깔린 구름층을 원근에 맞춰 펼친다. 큰 덩어리가 놓일 자리를 먼저 정하고, 잔 결로 뭉게뭉게한 가장자리를 만든다.
+        // 해 쪽으로 조금 옮긴 곳의 밀도를 견주어 해를 받는 쪽은 밝게, 반대쪽과 밑면은 푸르스름하게 그늘진다
+        if (d.y > -.05) {
+          vec2 uv = d.xz / (d.y + .12) * .09 + uTime * vec2(.0005, .0003);
+          float where = cloud3(uv * .42 + 3.7);
+          vec2 q = uv + (where - .5) * .05;
+          float n = cloud6(q) * .62 + where * .52;
+          float dense = smoothstep(.6, .73, n);
+          float wisp = smoothstep(.6, .78, cloud3(q * 2.6 + 1.3) * .7 + where * .4) * .28 * (1.0 - dense);
+          dense = max(dense, wisp);
+          float toward = cloud6(q + normalize(uSun.xz + 1e-4) * .02) * .62 + where * .52;
+          float lit = clamp(.62 + (n - toward) * 7.0, 0.0, 1.0);
+          vec3 shade = mix(vec3(.58, .64, .73), vec3(1.0, .985, .96), lit);
+          shade += vec3(1.0, .88, .7) * pow(s, 10.0) * .45 * (1.0 - smoothstep(.6, .9, dense));
+          float far = smoothstep(-.05, .22, d.y);
+          c = mix(c, mix(uHorizon * 1.04, shade, far), dense * smoothstep(-.05, .05, d.y) * .94);
+        }
         gl_FragColor = vec4(c, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -1071,28 +1100,22 @@ function buildStage() {
   sky.renderOrder = 10;   // 불투명한 물체 뒤에 그려 가려진 하늘을 계산하지 않는다
   scene.add(sky);
 
-  const puff = document.createElement('canvas');
-  puff.width = 256; puff.height = 128;
-  const g = puff.getContext('2d');
-  for (let i = 0; i < 26; i++) {
-    const x = 40 + rng() * 176, y = 46 + rng() * 44, r = 18 + rng() * 34;
-    const grad = g.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, 'rgba(255,255,255,.55)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = grad;
-    g.fillRect(x - r, y - r, r * 2, r * 2);
-  }
-  const puffTexture = new THREE.CanvasTexture(puff);
-  puffTexture.colorSpace = THREE.SRGBColorSpace;
+  // 예전의 흐린 구름 조각 대신 하늘 셰이더가 구름을 그린다. 다른 곳에서 쓰는 묶음만 남겨 둔다
   clouds = new THREE.Group();
-  for (let i = 0; i < 26; i++) {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTexture, fog: false, depthWrite: false, transparent: true, opacity: .55 + rng() * .35 }));
-    const a = rng() * Math.PI * 2, r = 5000 + rng() * 13000;
-    sprite.position.set(Math.cos(a) * r, 700 + rng() * 1500, Math.sin(a) * r);
-    sprite.scale.set(2400 + rng() * 2600, 620 + rng() * 620, 1);
-    clouds.add(sprite);
-  }
   scene.add(clouds);
+}
+
+// 구름 무늬: 이음매 없이 되풀이되는 부드러운 잡음(빨강)
+function cloudNoiseTexture() {
+  const size = 256, n = periodicNoise(size, 32), data = new Uint8Array(size * size * 4);
+  for (let i = 0; i < n.length; i++) data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = Math.round(n[i] * 255), data[i * 4 + 3] = 255;
+  const t = new THREE.DataTexture(data, size, size);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.needsUpdate = true;
+  return t;
 }
 
 /* ---------- 지면 텍스처 ---------- */
@@ -4488,7 +4511,8 @@ function buildStream(a, b, seed) {
   }
   for (let i = count - 1; i >= 0; i--) points[i].y = Math.min(points[i].y, points[i + 1].y - .03);
   for (let pass = 0; pass < 2; pass++) for (let i = 1; i < count; i++) points[i].y = (points[i - 1].y + points[i].y * 2 + points[i + 1].y) / 4;
-  points.forEach((p, i) => { p.w = lerp(1.25, .8, i / count) * (.9 + noise2(i * .13, seed) * .3); });
+  // 물길 양 끝은 좁아져 땅속으로 스며들듯 끝난다
+  points.forEach((p, i) => { p.w = lerp(1.25, .8, i / count) * (.9 + noise2(i * .13, seed) * .3) * (.25 + .75 * smooth(0, 5, Math.min(i, count - i))); });
   return { points, side, a, b, seed };
 }
 function flowTexture() {
@@ -4515,13 +4539,17 @@ let flowMap = null;
 function addStreamMeshes(streams) {
   if (!streams.length) return;
   flowMap ??= flowTexture();
-  const P = [], U = [], I = [];
+  const P = [], U = [], I = [], C = [];
   for (const { points } of streams) {
-    const start = P.length / 3, total = points.length - 1;
+    const start = P.length / 3, total = points.length - 1, falls = points[total].w > 3;
     points.forEach((p, i) => {
-      const a = points[Math.max(0, i - 1)], b = points[Math.min(total, i + 1)], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l, half = p.w + 1.4;
+      // 양 끝은 폭이 줄고 물빛이 옅어진다. 머리에 폭포가 있으면 그쪽은 소로 이어지므로 그대로 둔다
+      const low = smooth(0, 5, i), high = falls ? 1 : smooth(0, 5, total - i), fade = Math.min(low, high);
+      const a = points[Math.max(0, i - 1)], b = points[Math.min(total, i + 1)], dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l, half = p.w + 1.4 * (.3 + .7 * fade);
       P.push(p.x + nx * half, p.y, p.z + nz * half, p.x, p.y - .02, p.z, p.x - nx * half, p.y, p.z - nz * half);
       U.push(0, i * .22, .5, i * .22, 1, i * .22);
+      const alpha = smooth(0, 3, Math.min(i, falls ? 99 : total - i));
+      C.push(1, 1, 1, alpha * .7, 1, 1, 1, alpha, 1, 1, 1, alpha * .7);
     });
     for (let i = 0; i < total; i++) {
       const at = start + i * 3;
@@ -4531,11 +4559,13 @@ function addStreamMeshes(streams) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(C, 4));
   g.setIndex(I);
   g.computeVertexNormals();
-  const water = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: flowMap, color: '#7cc3d4', emissive: '#1f4f5c', transparent: true, opacity: .92, side: THREE.DoubleSide }));
+  const water = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: flowMap, vertexColors: true, color: '#7cc3d4', emissive: '#1f4f5c', transparent: true, opacity: .92, side: THREE.DoubleSide }));
   water.frustumCulled = false;
-  water.onBeforeRender = () => flowMap.offset.set(0, -time.value * .55);
+  // 점 번호가 작은 쪽이 아래쪽이다. 무늬를 번호가 작은 쪽으로 흘려 물이 아래로 흐르게 한다
+  water.onBeforeRender = () => flowMap.offset.set(0, time.value * .55);
   scene.add(water);
   backdrop.push(water);
 }
@@ -4582,12 +4612,19 @@ function readySites() {
   for (const poi of falls) {
     const stream = streamAt(poi.s);
     if (!stream) continue;
-    const { points } = stream, head = points[points.length - 1], next = points[points.length - 4], l = Math.hypot(head.x - next.x, head.z - next.z) || 1, dx = (head.x - next.x) / l, dz = (head.z - next.z) / l, tall = 6.5 + hash3(poi.s, 2, 9) * 4;
+    const { points } = stream, head = points[points.length - 1], next = points[points.length - 4], l = Math.hypot(head.x - next.x, head.z - next.z) || 1, up = [(head.x - next.x) / l, (head.z - next.z) / l];
     // 한 물길 머리에는 폭포를 하나만 세운다. 이름이 여럿이면 처음 것만 모형을 갖는다
     if (t.sites.some(o => o.kind === 'fall' && Math.hypot(o.x - head.x, o.z - head.z) < 1)) continue;
-    head.w = 3.2;
+    // 바위벽은 물길 위쪽과 길에서 먼 쪽 사이에 세워, 길에서 폭포 얼굴이 비스듬히 보이게 한다
+    const foot = nearest(head.x, head.z, 40), away = foot ? [head.x - t.xs[foot.i], head.z - t.zs[foot.i]] : up, al = Math.hypot(...away) || 1;
+    let dx = up[0] * .7 + away[0] / al * .7, dz = up[1] * .7 + away[1] / al * .7;
+    const fl = Math.hypot(dx, dz) || 1, tall = 13 + hash3(poi.s, 2, 9) * 8;   // 예전(6.5~10.5 m)의 두 배
+    dx /= fl;
+    dz /= fl;
+    head.w = 3.6;
     points[points.length - 2].w = 3;
-    const ridge = { x: head.x + dx * 6.5, z: head.z + dz * 6.5, y: head.y + tall, flat: 2.5, out: 8.5, clear: 7 };
+    // 바위벽 뒤로만 땅을 솟게 한다. 벽 안쪽(폭포와 소)까지 솟으면 물줄기를 가린다
+    const ridge = { x: head.x + dx * 19, z: head.z + dz * 19, y: head.y + tall * .92, flat: 4, out: 9, clear: 12 };
     // 솟은 땅이 길에 닿으면 길에서 먼 쪽으로 민다
     const close = nearest(ridge.x, ridge.z, ridge.out + 4);
     if (close) {
@@ -4957,42 +4994,150 @@ const SITE_BUILD = {
   tree() {},
   fall(tile, site) {
     siteParts();
-    const g = new THREE.Group(), { dx, dz, tall } = site, sideX = dz, sideZ = -dx;
-    // 절벽: 큰 바위를 활처럼 쌓고, 가운데로 물이 떨어진다.
-    // 폭포가 길 가까이 있으면 활 한쪽 끝이 길에 걸치므로, 길에서 3.6 m 안에 드는 바위는 쌓지 않고 남은 바위는 부딪히게 한다
-    for (let i = 0; i < 9; i++) {
-      const a = (i - 4) / 4, along = 3.6 + (1 - a * a) * 1.4, wide = a * 6.5, x = dx * along + sideX * wide, z = dz * along + sideZ * wide, rows = Math.ceil(tall / 2.4);
-      if (Math.abs(a) < .13) continue;
-      for (let r = 0; r < rows; r++) {
-        const rx = x + dx * r * .35, rz = z + dz * r * .35, size = 1.5 + hash3(i, r, 4) * .7;
-        if (nearest(site.x + rx, site.z + rz, size + 3.6)) continue;
-        craggy(g, i + r, rx, r * 2.2 + .8, rz, size, 1.1, i * r);
-        if (r === 0) tile.colliders.push({ x: site.x + rx, z: site.z + rz, r: size * .9, cam: 0 });
+    const g = new THREE.Group(), { dx, dz, tall } = site, sideX = dz, sideZ = -dx, seed = site.s * .013;
+    // 바위벽: 소를 반원으로 감싸고 길 쪽으로 열린 절벽. 가운데 턱에서 물이 떨어진다.
+    // 벽 끝이 길에서 4.5 m 안으로 들어오는 쪽은 거기서 끊는다
+    const Rw = 8, H = tall + 1.2, cols = 44, rowsW = 26, cx = dx * 2.2, cz = dz * 2.2;
+    const angleAt = c => (c / cols * 2 - 1) * 1.45;
+    const along = (c, r) => { const a = angleAt(c); return [cx + (dx * Math.cos(a) + sideX * Math.sin(a)) * r, cz + (dz * Math.cos(a) + sideZ * Math.sin(a)) * r]; };
+    const ok = c => { const [x, z] = along(c, Rw); return !nearest(site.x + x, site.z + z, 4.5); };
+    let c0 = cols / 2, c1 = cols / 2;
+    while (c0 > 0 && ok(c0 - 1)) c0--;
+    while (c1 < cols && ok(c1 + 1)) c1++;
+    const WP = [], WI = [], per = rowsW + 2;
+    for (let c = c0; c <= c1; c++) {
+      const a = angleAt(c), notch = Math.exp(-((a / .13) ** 2)), top = H - 1.2 * notch + noise2(a * 3 + seed, 4.1) * 1.6 * (1 - notch);
+      for (let r = 0; r <= rowsW; r++) {
+        const h = lerp(-2.5, top, r / rowsW);
+        // 층층이 갈라진 바위 결: 굵은 결과 잔 결을 겹치고, 위로 갈수록 조금 뒤로 눕힌다
+        const radius = Rw + noise2(a * 6 + seed, h * .32) * 1.1 + noise2(a * 17 - seed, h * .95) * .35 + Math.max(0, h) * .07 + Math.abs(Math.sin(h * .9 + a * 2)) * .25;
+        const [x, z] = along(c, radius);
+        WP.push(x, h, z);
       }
+      const [x, z] = along(c, Rw + 4.5);
+      WP.push(x, top + .4 + noise2(a * 5, 2.2) * .5, z);
+      if (c % 3 === 0) { const [bx, bz] = along(c, Rw); tile.colliders.push({ x: site.x + bx, z: site.z + bz, r: 1.6, cam: 0 }); }
     }
-    const P = [], U = [], I = [], rows = 14;
-    for (let r = 0; r <= rows; r++) {
-      const t = r / rows, away = lerp(4.8, .8, t ** 1.6), y = lerp(tall + .5, 0, t), half = lerp(.9, 1.5, t);
-      P.push(dx * away + sideX * half, y, dz * away + sideZ * half, dx * away - sideX * half, y, dz * away - sideZ * half);
-      U.push(0, t * 3, 1, t * 3);
-      if (r < rows) { const at = r * 2; I.push(at, at + 2, at + 1, at + 1, at + 2, at + 3); }
+    for (let c = 0; c < c1 - c0; c++) for (let r = 0; r < per - 1; r++) {
+      const p0 = c * per + r, p1 = p0 + per;
+      WI.push(p0, p0 + 1, p1, p1, p0 + 1, p1 + 1);
     }
-    const sheet = new THREE.BufferGeometry();
-    sheet.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
-    sheet.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
-    sheet.setIndex(I);
-    sheet.computeVertexNormals();
-    flowMap ??= flowTexture();
-    const white = new THREE.MeshLambertMaterial({ map: flowMap, color: '#f4fbff', emissive: '#7fa8b4', transparent: true, opacity: .94, side: THREE.DoubleSide }), fallOf = new THREE.Mesh(sheet, white);
-    g.add(fallOf);
-    const foam = new THREE.Mesh(new THREE.CircleGeometry(2.1, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#f2fafc', transparent: true, opacity: .55 }));
-    foam.position.set(dx * .8, .05, dz * .8);
-    g.add(foam);
-    tile.owned.push(sheet, white, foam.geometry, foam.material);
+    const wallGeo = new THREE.BufferGeometry();
+    wallGeo.setAttribute('position', new THREE.Float32BufferAttribute(WP, 3));
+    wallGeo.setIndex(WI);
+    wallGeo.computeVertexNormals();
+    const wall = new THREE.Mesh(wallGeo, summitRock);
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    g.add(wall);
+    tile.owned.push(wallGeo);
+    // 물줄기: 턱에서 조금 앞으로 튀어 나왔다가 곧게 떨어지고, 아래로 갈수록 넓게 퍼진다. 앞뒤 두 겹으로 깊이를 준다
+    fallMap ??= (() => { const m = (flowMap ??= flowTexture()).clone(); m.needsUpdate = true; return m; })();
+    const sheetOf = (inset, widen) => {
+      const P = [], U = [], I = [], across = 10, down = 60;
+      for (let r = 0; r <= down; r++) {
+        const t = r / down, out = Rw - .6 - inset - 1.8 * Math.sqrt(t), y = (H - 1.2) * (1 - t) + .1, half = lerp(1.4, 2.6, t) * widen;
+        for (let q = 0; q <= across; q++) {
+          const u = q / across * 2 - 1, ripple = noise2(u * 3 + seed, t * 9) * .16;
+          P.push(cx + dx * (out + ripple) + sideX * u * half, y, cz + dz * (out + ripple) + sideZ * u * half);
+          U.push(q / across, t * 5);
+        }
+      }
+      for (let r = 0; r < down; r++) for (let q = 0; q < across; q++) {
+        const p0 = r * (across + 1) + q, p1 = p0 + across + 1;
+        I.push(p0, p1, p0 + 1, p0 + 1, p1, p1 + 1);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+      geo.setIndex(I);
+      geo.computeVertexNormals();
+      return geo;
+    };
+    const front = sheetOf(0, 1), back = sheetOf(.35, .9);
+    const frontMat = new THREE.MeshLambertMaterial({ map: fallMap, color: '#f4fbff', emissive: '#7fa8b4', transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false });
+    const backMat = new THREE.MeshLambertMaterial({ map: fallMap, color: '#dceef4', emissive: '#4f7884', transparent: true, opacity: .5, side: THREE.DoubleSide, depthWrite: false });
+    const frontMesh = new THREE.Mesh(front, frontMat), backMesh = new THREE.Mesh(back, backMat);
+    frontMesh.onBeforeRender = () => fallMap.offset.set(0, -time.value * 1.6);
+    frontMesh.renderOrder = 2;
+    g.add(backMesh, frontMesh);
+    // 떨어진 물이 고이는 소: 물결과 햇빛 반사가 있는 물, 물이 닿는 곳의 흰 거품, 피어오르는 물보라
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(5.2, 56).rotateX(-Math.PI / 2), waterMaterial({ color: '#4f8aa6', emissive: '#16323e' }));
+    pool.position.set(cx + dx * 1.2, .06, cz + dz * 1.2);
+    pool.onBeforeRender = aimSunGlint;
+    const hitX = cx + dx * (Rw - 2.4), hitZ = cz + dz * (Rw - 2.4);
+    foamMap ??= foamTexture();
+    const foam = new THREE.Mesh(new THREE.CircleGeometry(3.6, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: foamMap, transparent: true, opacity: .8, depthWrite: false }));
+    foam.position.set(hitX, .12, hitZ);
+    foam.onBeforeRender = () => { foam.rotation.y = time.value * .35; };
+    const spray = sprayPoints(160, 2.6, 4.5);
+    spray.position.set(hitX, .2, hitZ);
+    g.add(pool, foam, spray);
+    tile.owned.push(front, back, frontMat, backMat, pool.geometry, pool.material, foam.geometry, foam.material, spray.geometry);
+    // 소 가장자리 바위: 크기를 고루 섞어 물가를 따라 놓는다. 길에 가까운 바위는 놓지 않는다
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14 * 2 - 1) * 2.4 + (hash3(i, 3, seed) - .5) * .3, r = 4.9 + hash3(i, 4, seed) * 1.6, size = .45 + hash3(i, 5, seed) ** 2 * 1.5;
+      const x = cx + dx * 1.2 + (dx * Math.cos(a) + sideX * Math.sin(a)) * r, z = cz + dz * 1.2 + (dz * Math.cos(a) + sideZ * Math.sin(a)) * r;
+      if (nearest(site.x + x, site.z + z, size + 3.6)) continue;
+      craggy(g, i, x, size * .25, z, size, size * .7, i * 1.7);
+      if (size > .9) tile.colliders.push({ x: site.x + x, z: site.z + z, r: size * .9, cam: 0 });
+    }
     g.position.set(site.x, site.y, site.z);
     tile.group.add(g);
   },
 };
+// 폭포 아래 거품: 가운데가 하얗고 가장자리로 갈수록 성기게 흩어진다
+let fallMap = null, foamMap = null;
+function foamTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  for (let i = 0; i < 900; i++) {
+    const a = hash3(i, 1, 21) * 6.283, r = Math.sqrt(hash3(i, 2, 21)) * 118, x = 128 + Math.cos(a) * r, y = 128 + Math.sin(a) * r, size = 2 + hash3(i, 3, 21) * 9;
+    g.fillStyle = `rgba(255,255,255,${(1 - r / 128) * (.25 + hash3(i, 4, 21) * .5)})`;
+    g.beginPath(); g.arc(x, y, size, 0, 6.283); g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+// 물보라: 물이 떨어지는 곳에서 알갱이가 피어올라 흩어지며 옅어진다
+function sprayPoints(count, radius, rise) {
+  const P = new Float32Array(count * 3), seed = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    const a = hash3(i, 1, 31) * 6.283, r = Math.sqrt(hash3(i, 2, 31)) * radius;
+    P.set([Math.cos(a) * r, 0, Math.sin(a) * r], i * 3);
+    seed[i] = hash3(i, 3, 31);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  sprayMat ??= new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, fog: false,
+    uniforms: { uTime: time, uRise: { value: rise } },
+    vertexShader: `attribute float aSeed; uniform float uTime; uniform float uRise; varying float vLife;
+      void main() {
+        float life = fract(uTime * (.2 + aSeed * .25) + aSeed * 7.0);
+        vLife = life;
+        vec3 p = position * (1.0 + life * .8);
+        p.y += life * uRise * (.5 + aSeed * .5);
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = (.5 + life * 1.6) * 420.0 / max(-mv.z, 1.0);
+      }`,
+    fragmentShader: `varying float vLife;
+      void main() {
+        vec2 q = gl_PointCoord - .5;
+        float r = dot(q, q) * 4.0;
+        if (r > 1.0) discard;
+        gl_FragColor = vec4(vec3(.95, .98, 1.0), (1.0 - r) * (1.0 - vLife) * .32);
+      }`,
+  });
+  const points = new THREE.Points(geo, sprayMat);
+  points.frustumCulled = false;
+  return points;
+}
+let sprayMat = null;
 function addStreamRocks(tile, stream) {
   const inside = (x, z) => x >= tile.ox && x < tile.ox + TILE && z >= tile.oz && z < tile.oz + TILE, spots = [];
   stream.points.forEach((p, i) => {
@@ -5028,7 +5173,6 @@ const MEET = {
   pavilion: { kicker: '정자', text: '정자 마루에 걸터앉아 쉽니다. 10초마다 체력이 1씩 오릅니다.', hint: '정자가 있어요. 마루 앞으로 가면 앉아서 쉽니다.' },
   cairn: { kicker: '돌탑', look: true, text: '오가는 사람들이 소원을 빌며 하나씩 얹은 돌이 사람 키보다 높이 쌓였습니다.' },
   sangu: { kicker: '산꾸', look: true, text: '누군가 바위벽에 단풍잎과 나뭇잎을 붙여 산을 꾸며 놓았습니다.' },
-  fall: { kicker: '폭포', look: true, energy: 0, reach: 24, text: '계곡 물이 바위 턱을 넘어 하얗게 쏟아집니다.' },
 };
 const DRINK_SECONDS = 4.6, REST_TICK = 10, SPRING_GAIN = 5;
 const amen = { visits: new Set(), hinted: new Set(), hold: false, act: null, site: null, approach: null, rootY: 0, yaw: 0, clock: 0, flowers: 0, energy: 0, resume: false, photo: null };
@@ -5624,7 +5768,7 @@ function addLandmarks(tile) {
 
 /* ---------- 캐릭터: 몸 전체를 뼈대로 움직이고, 옷은 고른 대로 입힌다 ---------- */
 const HB = { root: 0, hips: 1, spine: 2, chest: 3, neck: 4, head: 5, armL: 6, armR: 9, legL: 12, legR: 15 };
-const TONE = { skin: 0, hair: 1, hat: 2, top: 3, bottom: 4, shoe: 5, sole: 6, bag: 7, strap: 8, sock: 9, white: 10, iris: 11, lip: 12, dark: 13 };
+const TONE = { skin: 0, hair: 1, hat: 2, top: 3, bottom: 4, shoe: 5, sole: 6, bag: 7, strap: 8, sock: 9, white: 10, iris: 11, lip: 12, dark: 13, accent: 14 };
 const human = new Map();
 const lerp3 = (a, b, t) => a.map((v, i) => lerp(v, b[i], t));
 const alongLimb = (a, b, c, u) => (u < 1 ? lerp3(a, b, u) : lerp3(b, c, u - 1));
@@ -5654,10 +5798,11 @@ function humanRig(j) {
   }
   return rig;
 }
-function humanBody(gender, sleeve, legs) {
-  const key = `${gender}|${sleeve}|${legs}`;
+function humanBody(gender, sleeve, legs, style = '') {
+  const key = `${gender}|${sleeve}|${legs}|${style}`;
   if (human.has(key)) return human.get(key);
   const f = gender === 'female', j = humanJoints(f), m = newSolid(), Q = [], thin = f ? .86 : 1;
+  const minami = style === 'minami', woni = style === 'woni', idol = minami || woni;
   const part = (id, rows, bones, paint = flat(1), options = {}) => { const from = m.P.length; skin(m, rows, bones, paint, { fur: 1, ...options }); for (let i = from; i < m.P.length; i += 3) Q.push(id); };
   const bead = (id, x, y, z, rx, ry, rz, bone, sides = 8, paint) => {
     const rows = [];
@@ -5671,8 +5816,9 @@ function humanBody(gender, sleeve, legs) {
     const cheek = Math.hypot(Math.abs(x) - .068, (y - 1.56) * 1.3, (z - .09) * .6);
     if (s < 0) color.lerp(swatch('#ffc6b8'), smooth(.04, .012, cheek) * .55);
   };
-  const w = f ? .95 : 1;
-  part(TONE.skin, [[0, 1.474, .03, .012, .012], [0, 1.495, .036, .05 * w, .055], [0, 1.53, .026, .083 * w, .09], [0, 1.57, .015, .1 * w, .108], [0, 1.62, .008, .107 * w, .118], [0, 1.665, 0, .1 * w, .112], [0, 1.7, -.005, .07, .08], [0, 1.722, -.005, .02, .024]], [HB.head], face, { sides: 22, steps: 3 });
+  // 갸름한 얼굴: 볼을 좁히고 턱 끝을 모은다
+  const w = idol ? .86 : f ? .95 : 1, chin = idol ? .8 : 1;
+  part(TONE.skin, [[0, 1.474, .03, .012 * chin, .012], [0, 1.495, .036, .05 * w * chin, .055], [0, 1.53, .026, .083 * w * (idol ? .9 : 1), .09], [0, 1.57, .015, .1 * w, .108], [0, 1.62, .008, .107 * w, .118], [0, 1.665, 0, .1 * w, .112], [0, 1.7, -.005, .07, .08], [0, 1.722, -.005, .02, .024]], [HB.head], face, { sides: 22, steps: 3 });
   part(TONE.skin, [[0, 1.612, .112, .009, .007], [0, 1.592, .121, .011, .009], [0, 1.574, .128, .0145, .01], [0, 1.564, .122, .0135, .008], [0, 1.558, .112, .007, .005]], [HB.head], flat(.97), { sides: 8, steps: 2 });
   for (const side of [1, -1]) {
     bead(TONE.skin, side * .106 * w, 1.585, .002, .012, .027, .02, HB.head, 8, flat(.95));
@@ -5685,7 +5831,12 @@ function humanBody(gender, sleeve, legs) {
   }
   bead(TONE.lip, 0, 1.535, .1045, f ? .023 : .026, f ? .0058 : .0042, .0065, HB.head, 10);
   // 머리카락과 모자
-  if (f) {
+  if (idol) {
+    // 정수리에서 등 가운데까지 곧게 내려오는 긴 생머리, 어깨 앞으로 내려오는 옆머리, 이마를 덮는 앞머리
+    part(TONE.hair, [[0, 1.69, -.02, .02, .02], [0, 1.67, -.02, .118, .122], [0, 1.6, -.04, .123, .118], [0, 1.52, -.062, .12, .1], [0, 1.44, -.09, .136, .07], [0, 1.34, -.14, .152, .048], [0, 1.24, -.15, .155, .038], [0, 1.15, -.152, .146, .026], [0, 1.12, -.15, .02, .008]], [HB.head], flat(1), { sides: 20, steps: 2, shag: .07 });
+    for (const side of [1, -1]) part(TONE.hair, [[side * .098, 1.62, .03, .022, .022], [side * .11, 1.52, .035, .026, .026], [side * .118, 1.43, .06, .026, .022], [side * .124, 1.33, .1, .024, .018], [side * .12, 1.25, .112, .012, .01]], [HB.head], flat(.95), { sides: 8, steps: 2, shag: .1 });
+    for (const [x, drop] of [[-.05, .05], [-.018, .055], [.02, .052], [.052, .046]]) part(TONE.hair, [[x, 1.682, .098, .024, .012], [x * 1.05, 1.665, .112, .022, .01], [x * 1.1, 1.665 - drop, .116, .014, .006], [x * 1.1, 1.655 - drop, .112, .002, .002]], [HB.head], flat(1), { sides: 6, steps: 1 });
+  } else if (f) {
     part(TONE.hair, [[0, 1.415, -.055, .09, .06], [0, 1.47, -.05, .106, .08], [0, 1.54, -.04, .113, .098], [0, 1.6, -.032, .117, .112], [0, 1.67, -.02, .118, .122]], [HB.head], flat(1), { sides: 18, steps: 2, shag: .05 });
     part(TONE.hair, [[0, 1.635, -.1, .03, .03], [0, 1.61, -.148, .04, .04], [0, 1.5, -.172, .043, .041], [0, 1.38, -.155, .032, .03], [0, 1.29, -.14, .004, .004]], [HB.head], flat(.92), { sides: 10, steps: 2, shag: .14 });
     for (const [x, drop] of [[-.05, .035], [-.018, .03], [.02, .034], [.052, .028]]) part(TONE.hair, [[x, 1.682, .098, .022, .012], [x * 1.05, 1.665, .112, .02, .01], [x * 1.1, 1.665 - drop, .116, .012, .006], [x * 1.1, 1.655 - drop, .112, .002, .002]], [HB.head], flat(1), { sides: 6, steps: 1 });
@@ -5698,6 +5849,24 @@ function humanBody(gender, sleeve, legs) {
   part(TONE.hat, [[0, 1.682, .05, .1, .012], [0, 1.676, .115, .108, .01], [0, 1.666, .17, .09, .008], [0, 1.66, .205, .04, .005]], [HB.head], flat(.88), { sides: 14, steps: 3 });
   bead(TONE.hat, 0, 1.778, -.012, .012, .007, .012, HB.head, 8, flat(.74));
   bead(TONE.white, 0, 1.718, .1, .019, .012, .006, HB.head, 8);
+  const ring = (id, at, rx, rz, tube, bones, plane = 'flat') => {
+    const rows = [];
+    for (let i = 0; i <= 14; i++) {
+      const t = i / 14 * Math.PI * 2;
+      rows.push(plane === 'flat' ? [at[0] + Math.cos(t) * rx, at[1], at[2] + Math.sin(t) * rz, tube, tube, 0] : [at[0], at[1] + Math.cos(t) * rx, at[2] + Math.sin(t) * rz, tube, tube, 0]);
+    }
+    part(id, rows, bones, flat(1), { sides: 5, steps: 1 });
+  };
+  if (minami) {
+    // 모자 위 고양이 귀, 은색 고리 귀걸이, 분홍 끈 목걸이와 고양이 펜던트
+    for (const side of [1, -1]) {
+      part(TONE.hat, [[side * .066, 1.728, -.01, .027, .021], [side * .076, 1.76, -.012, .019, .014], [side * .086, 1.79, -.014, .008, .006], [side * .09, 1.803, -.014, .001, .001]], [HB.head], flat(.96), { sides: 4, steps: 1 });
+      ring(TONE.white, [side * (.106 * w + .006), 1.55, .004], .013, .013, .0022, [HB.head], 'side');
+    }
+    ring(TONE.accent, [0, 1.44, .008], .066, .082, .0028, [HB.chest]);
+    bead(TONE.accent, 0, 1.39, .122, .013, .015, .006, HB.chest, 8);
+    for (const side of [1, -1]) bead(TONE.accent, side * .007, 1.405, .121, .004, .006, .004, HB.chest, 4);
+  }
   for (const side of [1, -1]) bead(TONE.dark, side * .1, 1.722, -.012, .004, .004, .004, HB.head, 5);
   // 목과 몸
   part(TONE.skin, [[0, 1.4, 0, .052, .052, 0], [0, 1.45, .002, .05, .05, .6], [0, 1.5, .01, .049, .05, 1.2], [0, 1.53, .018, .05, .052, 2]], [HB.chest, HB.neck, HB.head], flat(.97), { sides: 14, steps: 2 });
@@ -5705,6 +5874,23 @@ function humanBody(gender, sleeve, legs) {
   part(TONE.bottom, [[0, .76, 0, .03, .03], [0, .8, 0, .13, .095], [0, .88, -.003, pelvisW + .01, .118], [0, .96, 0, pelvisW + .002, .11], [0, 1.03, 0, f ? .125 : .146, .102]], [HB.hips], flat(1), { sides: 20, steps: 2 });
   part(TONE.strap, [[0, .985, 0, pelvisW - .004, .112], [0, 1.01, 0, f ? .143 : .153, .109]], [HB.hips], flat(.9), { sides: 20, steps: 1 });
   bead(TONE.white, 0, .998, .112, .022, .016, .006, HB.hips, 6, flat(.8));
+  if (minami) {
+    // 분홍 호피 무늬가 박힌 3단 프릴 미니스커트: 단마다 아래로 퍼지고 끝단이 접혀 두께가 보인다
+    const leopard = (color, x, y, z) => {
+      color.setRGB(1, 1, 1);
+      // 진한 점을 옅은 테가 둘러싸 호피 무늬가 된다
+      const n = noise2(x * 38 + 3.1, (y * 1.4 + z) * 38 - 7.7);
+      if (n > .4) color.setRGB(.42, .3, .34);
+      else if (n > .22) color.multiplyScalar(.66);
+    };
+    for (const [top, low, r0, r1] of [[1.02, .905, .135, .205], [.935, .837, .19, .235], [.865, .76, .222, .265]]) {
+      // 무늬 점이 또렷하게 찍히도록 단마다 촘촘하게 나눈다
+      const rows = [];
+      for (let i = 0; i <= 8; i++) { const t = i / 8, r = lerp(r0, r1, t); rows.push([0, lerp(top, low + .008, t), lerp(.004, .006, t), r, r * .785]); }
+      rows.push([0, low, .006, r1 - .008, (r1 - .008) * .78]);
+      part(TONE.bottom, rows, [HB.hips], leopard, { sides: 72, steps: 2 });
+    }
+  }
   const shirt = (color, x, y, z, s) => {
     color.setRGB(1, 1, 1);
     if (y < .925) color.multiplyScalar(.84);
@@ -5713,7 +5899,14 @@ function humanBody(gender, sleeve, legs) {
   };
   const chestZ = f ? .022 : .012, chestD = f ? .13 : .13;
   part(TONE.top, [[0, .875, 0, pelvisW + .028, .136, 0], [0, .985, 0, pelvisW + .018, .128, .25], [0, 1.09, .004, (f ? .134 : .16), .112, .6], [0, 1.2, chestZ, (f ? .142 : .174), chestD - .006, 1], [0, 1.3, chestZ, (f ? .15 : .19), chestD, 1.5], [0, 1.385, 0, (f ? .15 : .186), .114, 2], [0, 1.44, -.005, (f ? .105 : .12), .082, 2], [0, 1.468, 0, .064, .064, 2.5], [0, 1.474, .002, .054, .055, 3]], [HB.hips, HB.spine, HB.chest, HB.neck], shirt, { sides: 26, steps: 3, boxy: .94 });
-  part(TONE.strap, [[0, 1.43, .078, .004, .003], [0, 1.31, .146, .0045, .003], [0, 1.2, .142, .0045, .003], [0, 1.08, .115, .0045, .003], [0, .94, .13, .004, .003]], [HB.chest], flat(.6), { sides: 5, steps: 2 });
+  part(woni ? TONE.white : TONE.strap, [[0, 1.43, .078, .004, .003], [0, 1.31, .146, .0045, .003], [0, 1.2, .142, .0045, .003], [0, 1.08, .115, .0045, .003], [0, .94, .13, .004, .003]], [HB.chest], flat(woni ? .95 : .6), { sides: 5, steps: 2 });
+  if (woni) part(TONE.top, [[0, 1.425, 0, .078, .074, 0], [0, 1.475, .004, .07, .068, .6], [0, 1.505, .006, .063, .06, 1], [0, 1.508, .006, .055, .052, 1]], [HB.chest, HB.neck], flat(.94), { sides: 18, steps: 1 });
+  // 운동복 옆선 네 줄: 소매와 바지 바깥쪽 면을 따라 흰 줄을 나란히 붙인다
+  const stripes = (side, a, b, c, table, bones) => {
+    for (const dz of [-.021, -.007, .007, .021]) {
+      part(TONE.white, table.map(([u, r]) => { const p = alongLimb(a, b, c, u); return [(p[0] + Math.sqrt(Math.max(r * r - dz * dz, 0)) + .0016) * side, p[1], p[2] + dz, .0034, .0034, jointMix(u)]; }), bones, flat(1), { sides: 5, steps: 1 });
+    }
+  };
   for (const side of [1, -1]) {
     bead(TONE.top, side * .09, 1.27, .133, .05, .058, .012, HB.chest, 8, flat(.9));
     // 팔과 손
@@ -5724,6 +5917,9 @@ function humanBody(gender, sleeve, legs) {
     const sleeveHem = (color, x, y) => { color.setRGB(1, 1, 1); if (y < lerp(s[1], e[1], .46)) color.multiplyScalar(.82); };
     if (sleeve === 'long') part(TONE.top, limb(side, s, e, wrist, [[-.08, .058, .062], [0, .066 * thin + .006, .07 * thin + .006], [.35, .062, .062], [.8, .054, .054], [1, .051, .051], [1.4, .047, .045], [1.85, .042, .037], [1.95, .039, .034], [1.96, .02, .02]]), armBones, cuff, { sides: 13, steps: 2 });
     else part(TONE.top, limb(side, s, e, wrist, [[-.08, .058, .062], [0, .066 * thin + .006, .07 * thin + .006], [.3, .063, .064], [.52, .062, .062], [.53, .03, .03]]), armBones, sleeveHem, { sides: 13, steps: 2 });
+    if (woni) stripes(side, s, e, wrist, [[.02, .068], [.35, .062], [.8, .054], [1, .051], [1.4, .047], [1.85, .042], [1.92, .04]], armBones);
+    // 미나미: 왼 손목의 분홍 팔찌
+    if (minami && side < 0) { const p = alongLimb(s, e, wrist, 1.86); ring(TONE.accent, [p[0] * side, p[1], p[2]], .036, .036, .008, [armBones[2]]); }
     const ww = wrist, hand = (x, y, z) => [ww[0] * side + x * side, ww[1] + y, ww[2] + z];
     part(TONE.skin, [[...hand(0, .01, 0), .027, .017], [...hand(.003, -.035, .004), .036, .017], [...hand(.003, -.075, .007), .036, .015], [...hand(.003, -.09, .008), .03, .01]].map(r => [...r, 0]), [armBones[2]], flat(1), { sides: 10, steps: 2 });
     for (const [dx, reach] of [[-.022, .05], [-.007, .062], [.008, .058], [.022, .046]]) {
@@ -5735,30 +5931,50 @@ function humanBody(gender, sleeve, legs) {
     part(TONE.skin, limb(side, h, k, a, [[-.05, .075, .085], [0, .082, .09], [.35, .074, .08], [.8, .055, .06], [1, .05, .053], [1.25, .054, .06], [1.6, .04, .042], [2, .033, .035]]), legBones, flat(1), { sides: 14, steps: 2 });
     const hem = (color, x, y) => { color.setRGB(1, 1, 1); if (y < a[1] + .05) color.multiplyScalar(.82); };
     const shortHem = (color, x, y) => { color.setRGB(1, 1, 1); if (y < lerp(h[1], k[1], .68)) color.multiplyScalar(.82); };
-    if (legs === 'long') part(TONE.bottom, limb(side, h, k, a, [[-.06, .088, .097], [0, .095, .103], [.4, .09, .096], [.85, .072, .076], [1, .068, .072], [1.3, .068, .074], [1.72, .062, .066], [1.9, .06, .064], [1.91, .03, .03]]), legBones, hem, { sides: 15, steps: 2 });
-    else part(TONE.bottom, limb(side, h, k, a, [[-.06, .088, .097], [0, .095, .103], [.4, .096, .102], [.72, .094, .1], [.73, .04, .04]]), legBones, shortHem, { sides: 15, steps: 2 });
-    const pocket = alongLimb(h, k, a, .56);
-    bead(TONE.bottom, side * (pocket[0] + .062), pocket[1], pocket[2], .03, .056, .05, legBones[0], 8, flat(.84));
-    part(TONE.sock, limb(side, h, k, a, [[1.74, .037, .039], [1.84, .04, .043], [2, .037, .039], [2.04, .036, .038]]), legBones, flat(1), { sides: 12, steps: 1 });
+    // 치마를 입으면 바지 없이 다리가 드러난다
+    if (!minami) {
+      if (legs === 'long') part(TONE.bottom, limb(side, h, k, a, [[-.06, .088, .097], [0, .095, .103], [.4, .09, .096], [.85, .072, .076], [1, .068, .072], [1.3, .068, .074], [1.72, .062, .066], [1.9, .06, .064], [1.91, .03, .03]]), legBones, hem, { sides: 15, steps: 2 });
+      else part(TONE.bottom, limb(side, h, k, a, [[-.06, .088, .097], [0, .095, .103], [.4, .096, .102], [.72, .094, .1], [.73, .04, .04]]), legBones, shortHem, { sides: 15, steps: 2 });
+      if (!woni) {
+        const pocket = alongLimb(h, k, a, .56);
+        bead(TONE.bottom, side * (pocket[0] + .062), pocket[1], pocket[2], .03, .056, .05, legBones[0], 8, flat(.84));
+      }
+    }
+    if (woni) stripes(side, h, k, a, [[.05, .101], [.4, .09], [.85, .072], [1, .068], [1.3, .068], [1.72, .062], [1.88, .06]], legBones);
+    // 미나미는 무릎 아래까지 오는 분홍 양말, 나머지는 발목 양말
+    if (minami) part(TONE.sock, limb(side, h, k, a, [[1.1, .055, .061], [1.14, .06, .066], [1.3, .058, .064], [1.6, .044, .047], [1.85, .04, .043], [2, .037, .039], [2.04, .036, .038]]), legBones, (color, x, y) => { color.setRGB(1, 1, 1); if (y > alongLimb(h, k, a, 1.16)[1]) color.multiplyScalar(1.06); }, { sides: 14, steps: 2 });
+    else part(TONE.sock, limb(side, h, k, a, [[1.74, .037, .039], [1.84, .04, .043], [2, .037, .039], [2.04, .036, .038]]), legBones, flat(1), { sides: 12, steps: 1 });
     const x0 = a[0] * side, zb = a[2] - .06;
-    const upper = (color, x, y, z) => { color.setRGB(1, 1, 1); if (z > .15) color.multiplyScalar(.86); if (Math.abs(Math.abs(x) - .1) > .03 && y < .07 && z < .1 && z > 0) color.setRGB(1.6, 1.6, 1.6); };
-    part(TONE.shoe, [[x0, .058, zb - .01, .012, .012], [x0, .074, zb + .015, .042, .046], [x0, .088, zb + .07, .047, .05], [x0, .074, zb + .135, .05, .043], [x0, .056, zb + .195, .051, .034], [x0, .048, zb + .24, .04, .026], [x0, .042, zb + .265, .012, .01]], [legBones[2]], upper, { sides: 16, steps: 3 });
-    part(TONE.sole, [[x0, .02, zb - .022, .012, .008], [x0, .02, zb, .046, .02], [x0, .02, zb + .1, .054, .02], [x0, .02, zb + .2, .054, .02], [x0, .024, zb + .258, .036, .016], [x0, .028, zb + .278, .01, .006], [x0, .028, zb + .28, .001, .001]], [legBones[2]], flat(1), { sides: 14, steps: 2 });
-    for (let i = 0; i < 4; i++) bead(TONE.white, x0, .104 - i * .009, zb + .08 + i * .026, .026, .0035, .005, legBones[2], 5);
-    bead(TONE.white, x0, .09, zb + .05, .02, .018, .016, legBones[2], 6);
+    if (minami) {
+      // 흰 통굽 부츠: 두툼한 밑창, 정강이 아래를 감싸는 목, 앞을 가로지르는 분홍 끈
+      part(TONE.sole, [[x0, .046, zb - .032, .014, .03], [x0, .046, zb - .006, .058, .046], [x0, .046, zb + .1, .066, .046], [x0, .046, zb + .2, .066, .046], [x0, .049, zb + .26, .046, .04], [x0, .051, zb + .285, .014, .016], [x0, .051, zb + .29, .001, .001]], [legBones[2]], flat(1), { sides: 16, steps: 2 });
+      part(TONE.shoe, [[x0, .1, zb - .02, .014, .014], [x0, .118, zb + .01, .056, .05], [x0, .135, zb + .07, .06, .058], [x0, .122, zb + .14, .062, .05], [x0, .104, zb + .2, .062, .04], [x0, .098, zb + .245, .05, .03], [x0, .095, zb + .272, .014, .012]], [legBones[2]], flat(1), { sides: 16, steps: 3 });
+      part(TONE.shoe, limb(side, h, k, a, [[1.6, .061, .066], [1.75, .063, .069], [1.9, .067, .073], [2.02, .07, .077], [2.06, .062, .068]]), legBones, flat(.97), { sides: 15, steps: 2 });
+      for (let i = 0; i < 7; i++) { const p = alongLimb(h, k, a, 1.64 + i * .06); bead(TONE.accent, p[0] * side, p[1], p[2] + .072, .03, .0045, .006, legBones[1], 5); }
+      for (let i = 0; i < 3; i++) bead(TONE.accent, x0, .148 - i * .012, zb + .1 + i * .035, .034, .0045, .006, legBones[2], 5);
+      bead(TONE.accent, x0, .2, zb + .02, .02, .03, .01, legBones[2], 6);
+    } else {
+      const upper = (color, x, y, z) => { color.setRGB(1, 1, 1); if (z > .15) color.multiplyScalar(.86); if (Math.abs(Math.abs(x) - .1) > .03 && y < .07 && z < .1 && z > 0) color.setRGB(1.6, 1.6, 1.6); };
+      part(TONE.shoe, [[x0, .058, zb - .01, .012, .012], [x0, .074, zb + .015, .042, .046], [x0, .088, zb + .07, .047, .05], [x0, .074, zb + .135, .05, .043], [x0, .056, zb + .195, .051, .034], [x0, .048, zb + .24, .04, .026], [x0, .042, zb + .265, .012, .01]], [legBones[2]], upper, { sides: 16, steps: 3 });
+      part(TONE.sole, [[x0, .02, zb - .022, .012, .008], [x0, .02, zb, .046, .02], [x0, .02, zb + .1, .054, .02], [x0, .02, zb + .2, .054, .02], [x0, .024, zb + .258, .036, .016], [x0, .028, zb + .278, .01, .006], [x0, .028, zb + .28, .001, .001]], [legBones[2]], flat(1), { sides: 14, steps: 2 });
+      for (let i = 0; i < 4; i++) bead(TONE.white, x0, .104 - i * .009, zb + .08 + i * .026, .026, .0035, .005, legBones[2], 5);
+      bead(TONE.white, x0, .09, zb + .05, .02, .018, .016, legBones[2], 6);
+    }
   }
-  // 배낭
-  const pack = (color, x, y, z, s) => { color.setRGB(1, 1, 1); if (y < 1.1) color.multiplyScalar(.86); if (y > 1.34) color.multiplyScalar(.9); };
-  part(TONE.bag, [[0, 1.02, -.205, .05, .03], [0, 1.045, -.205, .15, .078], [0, 1.15, -.21, .168, .088], [0, 1.3, -.21, .162, .088], [0, 1.4, -.205, .135, .078], [0, 1.445, -.2, .06, .04], [0, 1.455, -.2, .01, .01]], [HB.chest], pack, { sides: 18, steps: 2, boxy: .68 });
-  part(TONE.bag, [[0, 1.06, -.28, .03, .012], [0, 1.08, -.285, .11, .036], [0, 1.18, -.29, .118, .04], [0, 1.25, -.285, .1, .03], [0, 1.27, -.28, .03, .01]], [HB.chest], flat(.84), { sides: 14, steps: 2, boxy: .7 });
-  part(TONE.strap, [[-.075, 1.22, -.326, .004, .004], [0, 1.226, -.33, .006, .006], [.075, 1.22, -.326, .004, .004]], [HB.chest], flat(.7), { sides: 5, steps: 1 });
-  for (const side of [1, -1]) {
-    const x = side * (f ? .088 : .105);
-    part(TONE.strap, [[x, 1.42, -.13, .028, .01], [x, 1.468, -.05, .03, .012], [x, 1.45, .05, .03, .012], [x, 1.32, chestZ + .13, .028, .01], [x, 1.15, chestZ + .106, .026, .01], [x * 1.05, 1.03, .1, .024, .01]], [HB.chest], flat(1), { sides: 8, steps: 3 });
-    part(TONE.strap, [[side * .172, 1.2, -.24, .034, .034], [side * .176, 1.28, -.24, .036, .036], [side * .174, 1.31, -.24, .02, .02], [side * .174, 1.33, -.24, .016, .016]], [HB.chest], flat(.9), { sides: 10, steps: 1 });
+  // 배낭: 긴 머리와 겹치므로 미나미와 원이는 메지 않는다
+  if (!idol) {
+    const pack = (color, x, y, z, s) => { color.setRGB(1, 1, 1); if (y < 1.1) color.multiplyScalar(.86); if (y > 1.34) color.multiplyScalar(.9); };
+    part(TONE.bag, [[0, 1.02, -.205, .05, .03], [0, 1.045, -.205, .15, .078], [0, 1.15, -.21, .168, .088], [0, 1.3, -.21, .162, .088], [0, 1.4, -.205, .135, .078], [0, 1.445, -.2, .06, .04], [0, 1.455, -.2, .01, .01]], [HB.chest], pack, { sides: 18, steps: 2, boxy: .68 });
+    part(TONE.bag, [[0, 1.06, -.28, .03, .012], [0, 1.08, -.285, .11, .036], [0, 1.18, -.29, .118, .04], [0, 1.25, -.285, .1, .03], [0, 1.27, -.28, .03, .01]], [HB.chest], flat(.84), { sides: 14, steps: 2, boxy: .7 });
+    part(TONE.strap, [[-.075, 1.22, -.326, .004, .004], [0, 1.226, -.33, .006, .006], [.075, 1.22, -.326, .004, .004]], [HB.chest], flat(.7), { sides: 5, steps: 1 });
+    for (const side of [1, -1]) {
+      const x = side * (f ? .088 : .105);
+      part(TONE.strap, [[x, 1.42, -.13, .028, .01], [x, 1.468, -.05, .03, .012], [x, 1.45, .05, .03, .012], [x, 1.32, chestZ + .13, .028, .01], [x, 1.15, chestZ + .106, .026, .01], [x * 1.05, 1.03, .1, .024, .01]], [HB.chest], flat(1), { sides: 8, steps: 3 });
+      part(TONE.strap, [[side * .172, 1.2, -.24, .034, .034], [side * .176, 1.28, -.24, .036, .036], [side * .174, 1.31, -.24, .02, .02], [side * .174, 1.33, -.24, .016, .016]], [HB.chest], flat(.9), { sides: 10, steps: 1 });
+    }
+    part(TONE.strap, [[-.09, 1.25, chestZ + .135, .006, .012], [0, 1.255, chestZ + .142, .006, .012], [.09, 1.25, chestZ + .135, .006, .012]], [HB.chest], flat(.8), { sides: 6, steps: 2 });
+    part(TONE.hat, [[-.17, 1.5, -.2, .004, .004], [-.165, 1.5, -.2, .046, .046], [0, 1.5, -.2, .05, .05], [.165, 1.5, -.2, .046, .046], [.17, 1.5, -.2, .004, .004]], [HB.chest], flat(.78), { sides: 12, steps: 1 });
   }
-  part(TONE.strap, [[-.09, 1.25, chestZ + .135, .006, .012], [0, 1.255, chestZ + .142, .006, .012], [.09, 1.25, chestZ + .135, .006, .012]], [HB.chest], flat(.8), { sides: 6, steps: 2 });
-  part(TONE.hat, [[-.17, 1.5, -.2, .004, .004], [-.165, 1.5, -.2, .046, .046], [0, 1.5, -.2, .05, .05], [.165, 1.5, -.2, .046, .046], [.17, 1.5, -.2, .004, .004]], [HB.chest], flat(.78), { sides: 12, steps: 1 });
   const g = toSkinned(m), body = { index: g.index, position: g.attributes.position, normal: g.attributes.normal, skinIndex: g.attributes.skinIndex, skinWeight: g.attributes.skinWeight, shade: Float32Array.from(m.C), parts: Uint8Array.from(Q), rig: humanRig(j) };
   human.set(key, body);
   return body;
@@ -5766,7 +5982,7 @@ function humanBody(gender, sleeve, legs) {
 const SKIN_TONE = { male: '#e8bd98', female: '#f0cbaa' };
 const hikerMaterial = new THREE.MeshLambertMaterial({ vertexColors: true });
 function dressModel(model, look) {
-  const body = humanBody(look.gender, look.sleeve, look.legs), tones = [SKIN_TONE[look.gender], '#2a1e15', look.hat, look.top, look.bottom, look.shoe, '#efeade', look.bag, '#2c2a28', '#f2efe6', '#f8f6f1', '#3f2a1a', '#c8716a', '#14100c'].map(hex => new THREE.Color(hex));
+  const body = humanBody(look.gender, look.sleeve, look.legs, look.style), tones = [look.skin ?? SKIN_TONE[look.gender], look.hair ?? '#2a1e15', look.hat, look.top, look.bottom, look.shoe, look.sole ?? '#efeade', look.bag, '#2c2a28', look.sock ?? '#f2efe6', '#f8f6f1', '#3f2a1a', look.lip ?? '#c8716a', '#14100c', look.accent ?? '#ff7fb0'].map(hex => new THREE.Color(hex));
   const colors = new Float32Array(body.shade.length);
   for (let i = 0, at = 0; i < body.parts.length; i++, at += 3) {
     const tone = tones[body.parts[i]];
@@ -5786,7 +6002,7 @@ function dressModel(model, look) {
   model.mesh.geometry = g;
 }
 function makeHikerModel(look) {
-  const body = humanBody(look.gender, look.sleeve, look.legs), bones = body.rig.map(() => new THREE.Bone());
+  const body = humanBody(look.gender, look.sleeve, look.legs, look.style), bones = body.rig.map(() => new THREE.Bone());
   body.rig.forEach(({ parent, p }, i) => {
     const up = parent >= 0 ? body.rig[parent].p : [0, 0, 0];
     bones[i].position.set(p[0] - up[0], p[1] - up[1], p[2] - up[2]);
@@ -5920,12 +6136,13 @@ class Hiker {
   }
 }
 
+// 같이 오르는 등산객: 리센느 다섯 멤버. 상표는 넣지 않고 색과 차림만 맞췄다
 const NPC_LOOKS = [
-  { name: '산들', stamina0: 96, lane: -.9, start: 2.4, gender: 'male', sleeve: 'short', legs: 'long', top: '#d9593d', bottom: '#39424e', hat: '#e7d9b4', bag: '#32506b', shoe: '#2f3b46' },
-  { name: '다람', stamina0: 80, lane: .6, start: 1.6, gender: 'female', sleeve: 'long', legs: 'long', top: '#3b8ea5', bottom: '#4b4034', hat: '#f1c44b', bag: '#a8452f', shoe: '#f4efe4' },
-  { name: '솔이', stamina0: 62, lane: -.4, start: .8, gender: 'female', sleeve: 'short', legs: 'short', top: '#8a6fc9', bottom: '#2f3a33', hat: '#ffffff', bag: '#3b6b4a', shoe: '#e08bb0' },
-  { name: '바우', stamina0: 45, lane: .95, start: 3.2, gender: 'male', sleeve: 'long', legs: 'short', top: '#5d9c5a', bottom: '#3a3a45', hat: '#b5573b', bag: '#c5923a', shoe: '#7a5a3c' },
-  { name: '여울', stamina0: 30, lane: .2, start: 4, gender: 'female', sleeve: 'long', legs: 'long', top: '#e08bb0', bottom: '#40485a', hat: '#6b8fbf', bag: '#6c4f35', shoe: '#2b2c2e' },
+  { name: '원이', style: 'woni', stamina0: 96, lane: -.9, start: 2.4, gender: 'female', sleeve: 'long', legs: 'long', top: '#141414', bottom: '#141414', hat: '#141414', bag: '#222222', shoe: '#f4f4f4', hair: '#0f0b09', skin: '#f3d2ba', lip: '#d06a78' },
+  { name: '리브', stamina0: 80, lane: .6, start: 1.6, gender: 'female', sleeve: 'long', legs: 'long', top: '#9fb7e6', bottom: '#2c3345', hat: '#f2efe8', bag: '#e6d6c2', shoe: '#f4efe4', hair: '#7a5236' },
+  { name: '미나미', style: 'minami', stamina0: 62, lane: -.4, start: .8, gender: 'female', sleeve: 'short', legs: 'short', top: '#62cdb9', bottom: '#f2a6c2', hat: '#f4b4c8', bag: '#f3b8d4', shoe: '#f7f5f2', sole: '#f7f5f2', sock: '#f7c4d3', hair: '#a8724a', skin: '#f4d4bc', lip: '#e0708f', accent: '#ff7fb0' },
+  { name: '메이', stamina0: 45, lane: .95, start: 3.2, gender: 'female', sleeve: 'long', legs: 'long', top: '#c9e8d6', bottom: '#3b3b44', hat: '#2f3b52', bag: '#d9895a', shoe: '#2b2c2e', hair: '#1d1612' },
+  { name: '제나', stamina0: 30, lane: .2, start: 4, gender: 'female', sleeve: 'short', legs: 'long', top: '#f1e3c8', bottom: '#5a4636', hat: '#a8452f', bag: '#3b6b4a', shoe: '#7a5a3c', hair: '#5b2f24' },
 ];
 let player, npcs = [], everyone = [];
 const tags = new Map();
@@ -8140,6 +8357,19 @@ function bindControls() {
   addEventListener('keyup', e => { if (e.code === 'Escape') $('flora').hidden = true; });
   $('start').addEventListener('click', () => enterHike(pickedMountain?.id));
   $('trial').addEventListener('click', () => enterHike(TRIAL.id));
+  // 코스 지도 축소·확대. 고른 크기는 이 브라우저에 기억한다
+  const zoomMap = small => {
+    $('course-map-box').classList.toggle('small', small);
+    $('map-zoom').textContent = small ? '지도 확대' : '지도 축소';
+    $('map-zoom').setAttribute('aria-pressed', String(small));
+  };
+  try { zoomMap(localStorage.getItem('oreumgil-map-small') === '1'); } catch {}
+  $('map-zoom').addEventListener('click', e => {
+    const small = !$('course-map-box').classList.contains('small');
+    zoomMap(small);
+    try { localStorage.setItem('oreumgil-map-small', small ? '1' : '0'); } catch {}
+    if (e.detail) e.currentTarget.blur();
+  });
   $('promo-go').addEventListener('click', () => { closePromo(); enterHike(TRIAL.id); });
   $('promo-close').addEventListener('click', closePromo);
   $('promo').addEventListener('click', e => { if (e.target === e.currentTarget) closePromo(); });
@@ -9424,7 +9654,9 @@ function buildCourseMap() {
   stroke(10, 'rgba(255, 255, 255, .85)');
   stroke(5, '#d8452e');
   // 코스에 세운 장소: 작은 것은 점으로, 큰 것은 글자 표시와 이름으로 그린다
-  const marks = [...trail.sites.map(site => ({ ...site, ...(site.x === undefined ? (p => ({ x: p.x, z: p.z }))(trailAt(site.s)) : {}) })), ...trail.spans.map(span => { const p = trailAt((span.a + span.b) / 2); return { kind: 'bridge', x: p.x, z: p.z, label: span.label }; })];
+  // 이름 없이 고루 세운 정자, 쉼터, 약수터, 돌탑은 지도에 적지 않는다
+  const generic = site => ['pavilion', 'rest', 'spring', 'cairn'].includes(site.kind) && (site.made || /^(정자|쉼터|약수터|돌탑)$/.test(site.label));
+  const marks = [...trail.sites.filter(site => !generic(site)).map(site => ({ ...site, ...(site.x === undefined ? (p => ({ x: p.x, z: p.z }))(trailAt(site.s)) : {}) })), ...trail.spans.map(span => { const p = trailAt((span.a + span.b) / 2); return { kind: 'bridge', x: p.x, z: p.z, label: span.label }; })];
   for (const site of marks) {
     if (MAP_MARK[site.kind]) continue;
     g.beginPath();
