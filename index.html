@@ -115,6 +115,19 @@ body.panorama #hud, body.panorama #tags, body.panorama #flower-tag, body.panoram
   background: linear-gradient(180deg, rgba(12, 14, 12, .66) 0, rgba(12, 14, 12, .1) 170px, rgba(12, 14, 12, .1) calc(100% - 170px), rgba(12, 14, 12, .78) 100%);
 }
 #intro[hidden] { display: none; }
+/* 첫 화면 알림 창: 그림을 누르면 판매 페이지로, 아래 버튼을 누르면 겨울 한라산 체험 코스로 간다 */
+#promo { position: fixed; inset: 0; z-index: 26; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px)); background: rgba(12, 9, 5, .58); }
+#promo[hidden] { display: none; }
+.promo-card { position: relative; width: min(440px, 100%, calc((100vh - 190px) * .767)); max-height: 100%; display: grid; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--bark); box-shadow: 0 18px 54px rgba(0, 0, 0, .55); }
+.promo-art { display: block; min-height: 0; background: #0f0b07; }
+.promo-art[hidden] { display: none; }
+.promo-art img { display: block; width: 100%; height: 100%; max-height: calc(100vh - 190px); object-fit: contain; }
+.promo-art:focus-visible { outline: 2px solid var(--ribbon); outline-offset: -2px; }
+.promo-foot { padding: 14px 16px 16px; display: grid; gap: 10px; text-align: center; }
+.promo-foot p { margin: 0; font-size: 14px; color: var(--carve-dim); }
+.promo-go { font-family: var(--display); font-size: 18px; font-weight: 800; }
+.promo-close { position: absolute; top: 8px; right: 8px; z-index: 1; width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: rgba(20, 15, 9, .78); color: var(--carve); font-size: 20px; line-height: 1; cursor: pointer; }
+.promo-close:focus-visible, .promo-go:focus-visible { outline: 2px solid var(--carve); outline-offset: 2px; }
 .intro-main { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto auto; gap: 10px; }
 .brand { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; text-shadow: 0 1px 3px rgba(20, 15, 9, .8), 0 2px 16px rgba(20, 15, 9, .7); }
 h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(38px, 5.4vw, 60px); line-height: 1.05; letter-spacing: -.02em; animation: rise .8s ease-out backwards; }
@@ -502,6 +515,19 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
 
 <video id="intro-video" muted loop playsinline preload="auto" aria-hidden="true"></video>
 
+<div id="promo" role="dialog" aria-modal="true" aria-labelledby="promo-go" hidden>
+  <div class="promo-card">
+    <button class="promo-close" id="promo-close" type="button" aria-label="알림 닫기">✕</button>
+    <a class="promo-art" id="promo-art" href="https://smartstore.naver.com/sbw_mountain/products/13850469777" target="_blank" rel="noopener">
+      <img id="promo-image" width="1035" height="1349" alt="제주 한라산 트레킹 2박 3일 여행 일정표. 누르면 상품 페이지로 갑니다">
+    </a>
+    <div class="promo-foot">
+      <p>한라산 트래킹 코스 오픈기념</p>
+      <button class="go promo-go" id="promo-go" type="button">겨울 한라산 체험코스 오픈</button>
+    </div>
+  </div>
+</div>
+
 <section id="intro" aria-labelledby="intro-title" hidden>
   <div class="intro-main">
     <header class="brand">
@@ -532,7 +558,7 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
       <button class="tool" id="book-intro" type="button">도감 보기</button>
     </div>
     <p class="keys" id="keys">WASD·방향키로 걷기, 바닥 클릭으로 그 지점까지 걷기, 오른쪽 버튼을 누른 채 움직여 시점 바꾸기, 스페이스로 자동 등산, P로 파노라마, B로 도감.</p>
-    <p class="credit">등산로와 노면 자료: 한국등산트레킹지원센터, <a href="https://www.data.go.kr/data/15098177/fileData.do">공공데이터포털</a> (2022년 등록). 주변 지형과 먼 경치는 경로를 바탕으로 만든 가상 풍경이고, 지도는 지역 구분을 위해 간략하게 그린 그림입니다.</p>
+    <p class="credit">등산로와 노면 자료: 한국등산트레킹지원센터, <a href="https://www.data.go.kr/data/15098177/fileData.do">공공데이터포털</a>, 한국관광공사 TourAPI 사용</p>
   </div>
   <aside class="creator" aria-labelledby="creator-title">
     <h2 id="creator-title">캐릭터 만들기</h2>
@@ -1946,30 +1972,41 @@ function swayMaterial(amount, options = {}, foliage = false) {
   return m;
 }
 
-// 위를 향한 면에 눈을 얹은 재질. 원래 재질의 셰이더 고치기를 먼저 하고 이어서 덧붙인다
-function snowy(material) {
+// 위를 향한 면에 눈을 얹은 재질. 원래 재질의 셰이더 고치기를 먼저 하고 이어서 덧붙인다.
+// amount는 예전 눈 양을 1로 본 배율의 범위다. 나무(인스턴스)마다 이 범위 안에서 양이 다르다
+function snowy(material, amount = [1, 1]) {
   const m = material.clone(), before = material.onBeforeCompile, key = material.customProgramCacheKey();
+  m.defines = { ...material.defines, SNOW_MIN: amount[0].toFixed(2), SNOW_MAX: amount[1].toFixed(2) };
   m.onBeforeCompile = (shader, renderer) => {
     before.call(m, shader, renderer);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying float vSnowUp;\nvarying vec3 vSnowP;')
+      .replace('#include <common>', '#include <common>\nvarying float vSnowUp;\nvarying vec3 vSnowP;\nvarying float vSnowAmt;')
       .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
         {
           vec3 up = objectNormal;
           vec4 at = vec4(position, 1.0);
+          vec3 seat = modelMatrix[3].xyz;
           #ifdef USE_INSTANCING
             up = mat3(instanceMatrix) * up;
             at = instanceMatrix * at;
+            seat += instanceMatrix[3].xyz;
           #endif
           vSnowUp = normalize(mat3(modelMatrix) * up).y;
           vSnowP = (modelMatrix * at).xyz;
+          vSnowAmt = fract(sin(dot(seat.xz, vec2(12.9898, 78.233))) * 43758.5453);
         }`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vSnowUp;\nvarying vec3 vSnowP;')
+      .replace('#include <common>', '#include <common>\nvarying float vSnowUp;\nvarying vec3 vSnowP;\nvarying float vSnowAmt;')
       .replace('#include <color_fragment>', `#include <color_fragment>
         {
+          // 눈 덮인 면의 비율은 배율에 비례한다. 배율 1이면 위를 향한 면의 약 3할이 덮인다
           float grain = fract(sin(dot(floor(vSnowP * 7.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-          float cover = smoothstep(.2, .55, vSnowUp + (grain - .5) * .3);
+          float amount = mix(float(SNOW_MIN), float(SNOW_MAX), vSnowAmt), lo = 1.0 - 2.0 * clamp(.31 * amount, 0.0, .97);
+          float cover = smoothstep(lo - .17, lo + .17, vSnowUp + (grain - .5) * .3);
+          #ifdef FOLIAGE
+            // 잎에는 눈이 덜 덮여 초록 잎이 군데군데 비친다
+            cover *= .55 + grain * .3;
+          #endif
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.86, .89, .93) * (.92 + grain * .08), cover);
         }`);
   };
@@ -3154,14 +3191,20 @@ function plantKinds() {
     ropeSeg: { parts: [{ geo: toGeometry(rope), mat: logMat }], layer: 'small' },
   });
 
-  // 겨울 코스용: 잎을 뗀 나무, 가지와 윗면에 눈이 쌓인 나무·바위·계단
-  const snowMats = new Map(), snowOf = mat => { if (!snowMats.has(mat)) snowMats.set(mat, snowy(mat)); return snowMats.get(mat); };
+  // 겨울 코스용: 잎을 뗀 나무, 가지와 윗면에 눈이 쌓인 나무·바위·계단.
+  // 잎 진 나무의 눈은 예전의 2~3배, 초록 나무는 잎과 가지에 0.5~2배를 얹는다
+  const snowMats = new Map(), snowOf = (mat, amount = [1, 1]) => {
+    const key = `${mat.uuid}|${amount}`;
+    if (!snowMats.has(key)) snowMats.set(key, snowy(mat, amount));
+    return snowMats.get(key);
+  };
   for (const [name, spec] of Object.entries({ ...out })) {
     const base = name.replace(/(Low|Far)$/, '');
     if (TREES[base] || base.startsWith('young')) {
       const wood = spec.parts[0];
       out[winterName(name, 'Bare')] = { parts: [wood], layer: spec.layer };
-      out[winterName(name, 'Snow')] = { parts: [{ ...wood, mat: snowOf(wood.mat) }], layer: spec.layer };
+      out[winterName(name, 'Snow')] = { parts: [{ ...wood, mat: snowOf(wood.mat, [2, 3]) }], layer: spec.layer };
+      out[winterName(name, 'Frost')] = { parts: spec.parts.map(part => ({ ...part, mat: snowOf(part.mat, [.5, 2]) })), layer: spec.layer };
     } else if (SNOW_CAPPED.has(name) || SNOW_PATH.has(name)) {
       out[winterName(name, 'Snow')] = { parts: spec.parts.map(part => ({ ...part, mat: snowOf(part.mat) })), layer: spec.layer };
     }
@@ -3510,7 +3553,7 @@ function* plantTile(tile) {
   addPlants(tile, course.winter ? winterize(tile, lists) : lists);
 }
 
-// 겨울 코스: 초록 잎 나무는 다섯에 하나만 남기고(잎 지는 나무였다면 소나무로 바꾼다), 나머지는 잎 진 나무로, 그 절반은 가지에 눈이 쌓인 나무로 한다.
+// 겨울 코스: 초록 잎 나무는 다섯에 하나만 남겨 잎에도 눈을 얹고(잎 지는 나무였다면 소나무로 바꾼다), 나머지는 잎 진 나무로, 그 절반은 가지에 눈이 쌓인 나무로 한다.
 // 꽃은 절반, 풀과 덤불은 열에 셋만 남기고, 바위와 눈 덮인 구간의 계단·데크에는 눈을 얹는다
 const EVERGREEN = new Set(['pine', 'koreanPine', 'fir', 'yew', 'gusang', 'youngFir']);
 const GROUND_COVER = new Set(['grassThin', 'grassBroad', 'grassDry', 'silver', 'sedge', 'fern', 'butterbur', 'solomon', 'bamboo', 'bush', 'clover']);
@@ -3527,8 +3570,8 @@ function winterize(tile, lists) {
       if (item.matrix) { add(kind, item); continue; }
       const roll = winterRoll(item);
       if (TREES[base] || base.startsWith('young')) {
-        if (item.keep) add(kind, item);
-        else if (roll < .2) add(EVERGREEN.has(base) ? kind : base.startsWith('young') ? 'youngFir' : kind.replace(base, 'pine'), item);
+        if (item.keep) add(winterName(kind, 'Frost'), item);
+        else if (roll < .2) add(winterName(EVERGREEN.has(base) ? kind : base.startsWith('young') ? 'youngFir' : kind.replace(base, 'pine'), 'Frost'), item);
         else add(winterName(kind, roll < .6 ? 'Bare' : 'Snow'), item);
       } else if (GROUND_COVER.has(kind)) { if (roll < .3) add(kind, item); }
       else if (kind.startsWith('flora_')) { if (roll < .5) add(kind, item); }
@@ -5854,7 +5897,10 @@ const tags = new Map();
 
 function buildHikers() {
   player = new Hiker({ name: '나', lane: 0, ...look });
-  player.onStep = () => sound.step(stepSurface());
+  player.onStep = () => {
+    const kind = stepSurface();
+    sound.step(kind, course?.winter ? (kind === 'snow' ? .8 : 1.2) : 1);
+  };
   npcs = NPC_LOOKS.map(look => new Hiker(look));
   everyone = [player, ...npcs];
   npcs.forEach(npc => {
@@ -7468,7 +7514,7 @@ class Sound {
     }
   }
   audible() { return this.ctx?.state === 'running' && this.volume > 0 && !document.hidden; }
-  step(kind = 'dirt') {
+  step(kind = 'dirt', loud = 1) {
     if (!this.audible()) return;
     const { ctx } = this, set = this.steps[kind];
     const source = ctx.createBufferSource();
@@ -7480,7 +7526,7 @@ class Sound {
     const high = ctx.createBiquadFilter();
     high.type = 'highpass'; high.frequency.value = 90;
     const gain = ctx.createGain();
-    gain.gain.value = (kind === 'stone' ? .17 : .23) + Math.random() * .06;
+    gain.gain.value = ((kind === 'stone' ? .17 : .23) + Math.random() * .06) * loud;
     source.connect(high).connect(low).connect(gain).connect(this.master);
     source.onended = () => gain.disconnect();
     source.start();
@@ -8026,6 +8072,7 @@ function bindControls() {
       if (e.code === 'Escape' && $('flora').hidden) closeBook();
       return;
     }
+    if (!$('promo').hidden) { if (e.code === 'Escape') closePromo(); return; }
     if (state.mode === 'intro' && e.code === 'Escape' && !$('map-panel').classList.contains('mini')) sizeMap(false);
     if (state.mode !== 'hike') return;
     if (e.code === 'KeyB' && !e.repeat && !pano.on) { openBook(); return; }
@@ -8057,6 +8104,9 @@ function bindControls() {
   addEventListener('keyup', e => { if (e.code === 'Escape') $('flora').hidden = true; });
   $('start').addEventListener('click', () => enterHike(pickedMountain?.id));
   $('trial').addEventListener('click', () => enterHike(TRIAL.id));
+  $('promo-go').addEventListener('click', () => { closePromo(); enterHike(TRIAL.id); });
+  $('promo-close').addEventListener('click', closePromo);
+  $('promo').addEventListener('click', e => { if (e.target === e.currentTarget) closePromo(); });
   $('auto').addEventListener('click', e => { toggleAuto(); if (e.detail) e.currentTarget.blur(); });
   $('panorama').addEventListener('click', e => { togglePanorama(); if (e.detail) e.currentTarget.blur(); });
   $('pano-stop').addEventListener('click', () => { pano.leaving = true; });
@@ -8166,8 +8216,24 @@ function showIntro() {
     video.src = INTRO_VIDEO;
   }
   video.play().catch(() => {});
+  showPromo();
 }
+// 첫 화면 알림 창은 이 페이지를 열 때 한 번만 띄운다
+const PROMO_IMAGE = 'media/promo.webp';
+let promoSeen = false;
+function showPromo() {
+  if (promoSeen) return;
+  promoSeen = true;
+  // 그림은 창을 띄울 때 불러온다. 파일이 없으면 글과 버튼만 보인다
+  const image = $('promo-image');
+  image.addEventListener('error', () => { $('promo-art').hidden = true; }, { once: true });
+  image.src = PROMO_IMAGE;
+  $('promo').hidden = false;
+  $('promo-go').focus({ preventScroll: true });
+}
+function closePromo() { $('promo').hidden = true; }
 function leaveIntro() {
+  closePromo();
   $('intro').hidden = true;
   $('intro-video').hidden = true;
   $('intro-video').pause();
@@ -9547,7 +9613,7 @@ async function boot() {
   photos = await readJson('photos/index.json').catch(() => photos);
   catalog = await readJson('courses/index.json');
   for (const row of catalog) row.summit = tidySummit(row.summit, row.name);
-  $('intro-count').textContent = `실제 등산로 ${catalog.length}개 산`;
+  $('intro-count').textContent = '산림청 GPX 데이터를 기반으로 실제 등산로 구현';
   buildMap();
   buildCreator();
   bindControls();
