@@ -382,12 +382,16 @@ h1 small { margin-left: 9px; font-family: var(--ui); font-weight: 500; font-size
 .game-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .game-actions button { flex: 1 1 120px; min-height: 46px; font-size: 15px; }
 .game-actions button:disabled { opacity: .45; }
-.gourd { width: min(180px, 48vw); height: auto; }
-.stack-view { width: min(300px, 100%); height: auto; border-radius: 4px; }
-.stone-picks, .leaf-picks { width: 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-.stone-picks[hidden] { display: none; }
-.stone-pick, .leaf-pick { min-height: 0; padding: 6px 2px; display: grid; justify-items: center; gap: 2px; font-size: 12px; }
-.stone-pick canvas { width: 100%; height: auto; }
+.leaf-picks { width: 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.leaf-pick { min-height: 0; padding: 6px 2px; display: grid; justify-items: center; gap: 2px; font-size: 12px; }
+/* 실제 물건으로 하는 놀이의 안내 띠: 창 대신 한 줄 안내와 단추만 둔다 */
+#play-bar { position: fixed; left: 50%; bottom: calc(122px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 33; width: min(620px, calc(100vw - 32px)); padding: 10px 12px; display: grid; gap: 8px; border: 1px solid var(--ribbon); border-radius: 6px; background: var(--shade); animation: meetIn .35s ease-out; }
+#play-bar[hidden] { display: none; }
+#play-text { margin: 0; font-size: 14px; line-height: 1.45; text-align: center; font-variant-numeric: tabular-nums; }
+#play-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+#play-actions button { min-height: 42px; padding: 0 14px; font-size: 14px; }
+body.panorama #play-bar, body.playing #panorama, body.playing #auto { visibility: hidden; }
+@media (min-width: 900px) { #play-bar { top: calc(80px + env(safe-area-inset-top, 0px)); bottom: auto; } }
 .leaf-pick canvas { width: 40px; height: 40px; }
 .leaf-pick[aria-pressed="true"] { border-color: var(--ribbon); background: rgba(245, 181, 42, .2); }
 .leaf-preview { width: 160px; height: 160px; }
@@ -489,6 +493,10 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
   <p id="game-note" aria-live="polite"></p>
   <div class="game-actions" id="game-actions"></div>
 </section>
+<div id="play-bar" role="group" aria-label="놀이" hidden>
+  <p id="play-text" aria-live="polite"></p>
+  <div id="play-actions"></div>
+</div>
 <button class="walk" id="rest-end" type="button" hidden>휴식 종료</button>
 <div id="rest-fx" aria-hidden="true" hidden><i>+</i><i>+</i><i>+</i><b id="rest-gain">체력 +1</b></div>
 <div id="flash" aria-hidden="true"></div>
@@ -5263,10 +5271,10 @@ const STAR = '<svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="
 const GAMES = {
   gourdGame: { title: '물 받기 약수터', text: '조롱박에 그어진 선까지 약수를 받아 보세요. 시작을 누르면 물이 차오르고 멈춤을 누르면 멈춥니다. 선에서 위아래 5% 안에 멈추면 성공입니다.', reward: '성공하면 기운 +1' },
   stackGame: { title: '돌탑 쌓기', text: '모양이 다른 돌 다섯 개 가운데 하나를 골라 돌탑 위에 얹어 보세요. 떨어지지 않으면 성공입니다.', reward: '성공하면 기운 +1' },
-  photoStudio: { title: '동물사진관', text: '기운 1을 도토리 5개로 바꿔 나무 밥그릇에 넣으면, 숲속 동물이 찾아와 먹고 함께 사진을 찍어 줍니다. 신비한 동물이 올 때도 있어요.', reward: '찍은 사진은 도감의 동물 사진에 담깁니다' },
+  photoStudio: { title: '동물사진관', text: '기운 1을 도토리 5개로 바꿔 나무 밥그릇에 넣으면, 숲속 동물이 찾아와 10초쯤 먹는 동안 곁에 앉아 지켜보고 함께 사진을 찍습니다. 신비한 동물이 올 때도 있어요.', reward: '찍은 사진은 도감의 동물 사진에 담깁니다' },
   leafGame: { title: '산꾸 꾸미기', text: '돌담 빈자리에 나뭇잎 한 장을 골라 붙이고, 20자 안으로 남기고 싶은 말을 써 보세요. 글은 손글씨로 나뭇잎에 적힙니다.', reward: '붙인 나뭇잎은 다음에 와도 남아 있어요' },
 };
-const game = { site: null, raf: 0, studio: null };
+const game = { site: null, raf: 0, studio: null, world: null, view: null };
 function openGame(site) {
   const spec = GAMES[site.kind];
   game.site = site;
@@ -5277,7 +5285,7 @@ function openGame(site) {
   $('game-text').textContent = spec.text;
   $('game-note').textContent = spec.reward;
   $('game-stage').replaceChildren();
-  gameButtons([['해보기', () => ({ gourdGame: playGourd, stackGame: playStack, photoStudio: playStudio, leafGame: playLeaf })[site.kind](site), true], ['지나가기', closeGame]]);
+  gameButtons([['해보기', () => ({ photoStudio: playStudio, leafGame: playLeaf })[site.kind](site), true], ['지나가기', closeGame]]);
   $('game').hidden = false;
   $('game-actions').querySelector('button')?.focus({ preventScroll: true });
 }
@@ -5302,185 +5310,320 @@ function closeGame() {
   resumeAuto();
 }
 
-// 1. 물 받기: 조롱박 그림에 물이 차오르고, 붉은 표시선 가까이에서 멈춰야 한다
-const GOURD = 'M100 34C80 34 72 52 74 70C76 88 88 96 86 108C84 120 46 128 40 172C34 218 66 248 100 248C134 248 166 218 160 172C154 128 116 120 114 108C112 96 124 88 126 70C128 52 120 34 100 34Z';
-function playGourd(site) {
-  const target = Math.round(45 + Math.random() * 40), low = 244, high = 40, line = low - (low - high) * target / 100;
-  $('game-stage').innerHTML = `<svg class="gourd" viewBox="0 0 200 262" role="img" aria-label="조롱박에 물 받기. 표시선 ${target}%">
-    <defs><clipPath id="gourd-in"><path d="${GOURD}"/></clipPath></defs>
-    <rect x="93" y="10" width="14" height="28" rx="5" fill="#7a5a2a"/>
-    <path d="${GOURD}" fill="#f3e2b0"/>
-    <g clip-path="url(#gourd-in)"><rect id="gourd-water" x="0" y="${low}" width="200" height="0" fill="#5fb3d6"/><rect id="gourd-foam" x="0" y="${low}" width="200" height="4" fill="#dff3fb"/></g>
-    <line x1="34" x2="166" y1="${line}" y2="${line}" stroke="#d8452e" stroke-width="3" stroke-dasharray="9 6"/>
-    <text x="170" y="${line + 5}" fill="#f6e8bd" font-size="15" font-weight="700">${target}%</text>
-    <path d="${GOURD}" fill="none" stroke="#7a5a2a" stroke-width="5"/>
-    <path d="M64 150C58 178 64 206 80 222" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="6" stroke-linecap="round"/>
-  </svg>`;
-  let level = 0, last = 0;
-  const water = $('gourd-water'), foam = $('gourd-foam');
-  const draw = () => {
-    const y = low - (low - high) * level / 100;
-    water.setAttribute('y', y);
-    water.setAttribute('height', low - y + 12);
-    foam.setAttribute('y', y - 1);
-    $('game-note').textContent = `물 ${level.toFixed(0)}% · 표시선 ${target}%`;
-  };
-  const tick = now => {
-    const dt = Math.min(.05, (now - last) / 1000);
-    last = now;
-    // 차오를수록 조금씩 빨라진다
-    level = Math.min(100, level + dt * (24 + level * .22));
-    draw();
-    if (level >= 100) { stop(); return; }
-    game.raf = requestAnimationFrame(tick);
-  };
-  const stop = () => {
-    cancelAnimationFrame(game.raf);
-    const gap = Math.abs(level - target), ok = gap <= 5, first = ok && !site.won;
-    if (first) { site.won = true; gainEnergy(1); }
-    $('game-note').textContent = ok ? `성공! 표시선과 ${gap.toFixed(1)}% 차이예요.${first ? ' 기운 +1' : ''}` : level >= 100 ? '물이 넘쳤어요. 다시 해 볼까요?' : `아쉬워요. 표시선과 ${gap.toFixed(1)}% 차이가 났어요.`;
-    gameButtons([['다시 하기', start, !ok], ['그만하기', closeGame, ok]]);
-  };
-  const start = () => {
-    level = 0;
-    last = performance.now();
-    draw();
-    cancelAnimationFrame(game.raf);
-    game.raf = requestAnimationFrame(tick);
-    gameButtons([['멈춤', stop, true]]);
-  };
-  draw();
-  gameButtons([['시작', start, true], ['그만하기', closeGame]]);
+/* ---------- 그 자리의 물건으로 하는 놀이: 물 받기 약수터와 돌탑 쌓기는 창 없이 실제 조롱박과 돌탑으로 한다 ---------- */
+const WORLD_GAMES = new Set(['gourdGame', 'stackGame']);
+const gameRig = new THREE.PerspectiveCamera(), gameRay = new THREE.Raycaster(), gamePointer = new THREE.Vector2();
+// 아래쪽 안내 띠: 한 줄 안내와 단추 몇 개만 둔다
+function playBar(text, buttons = []) {
+  $('play-text').textContent = text;
+  $('play-actions').replaceChildren(...buttons.map(([label, act, main]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = main ? 'go' : 'tool';
+    b.textContent = label;
+    b.addEventListener('click', act);
+    return b;
+  }));
+  $('play-bar').hidden = false;
+  if (game.world) game.world.main = buttons.find(b => b[2])?.[1] ?? null;
+}
+function startWorldGame(site) {
+  game.site = site;
+  walkTo(null);
+  keys.clear();
+  marker.visible = false;
+  game.world = { site, clock: 0 };
+  amen.hold = true;
+  document.body.classList.add('playing');
+  (site.kind === 'gourdGame' ? startGourd : startStack)(game.world);
+}
+function endWorldGame() {
+  const w = game.world;
+  if (!w) return;
+  game.world = null;
+  game.view = null;
+  game.site = null;
+  $('play-bar').hidden = true;
+  document.body.classList.remove('playing');
+  w.site.gourdStream?.(0);
+  if (w.site.gourd) { w.site.gourd.position.set(-.42, .52, .24); w.site.gourd.rotation.z = .28; }
+  if (w.site.dipper) w.site.dipper.visible = true;
+  // 등산로 쪽 원래 자리로 돌아가고, 카메라는 등산객 뒤로 부드럽게 돌아온다
+  if (w.back) {
+    player.x = w.back.x;
+    player.z = w.back.z;
+    player.y = groundHeight(w.back.x, w.back.z);
+    player.index = w.back.index;
+    player.off = w.back.off;
+  }
+  state.blend = 0;
+  amen.hold = false;
+  player.act = null;
+  resumeAuto();
+}
+// 놀이하는 동안 카메라를 그 물건 가까이로 옮긴다
+function stepGameView(dt) {
+  const v = game.view;
+  if (!v.from) { v.from = camera.position.clone(); v.fromQ = camera.quaternion.clone(); v.blend = 0; }
+  v.blend = Math.min(1, v.blend + dt / 1.1);
+  const k = smooth(0, 1, v.blend);
+  gameRig.position.copy(v.pos);
+  gameRig.lookAt(v.look);
+  camera.position.lerpVectors(v.from, v.pos, k);
+  camera.quaternion.slerpQuaternions(v.fromQ, gameRig.quaternion, k);
+}
+function worldClick(x, y) {
+  const w = game.world;
+  if (!w?.click) return;
+  const rect = canvas.getBoundingClientRect();
+  gamePointer.set((x - rect.left) / rect.width * 2 - 1, -(y - rect.top) / rect.height * 2 + 1);
+  gameRay.setFromCamera(gamePointer, camera);
+  w.click(gameRay);
 }
 
-// 2. 돌탑 쌓기: 고른 돌이 좌우로 움직이고, 놓기를 누르면 떨어진다. 가운데 가까이 얹혀야 버틴다
-const STONES = [
-  { name: '넓적돌', w: 96, h: 20, grip: 26, speed: 2.1, flat: true },
-  { name: '긴돌', w: 118, h: 17, grip: 22, speed: 2.4, flat: true },
-  { name: '쐐기돌', w: 74, h: 32, grip: 15, speed: 2.5, wedge: true },
-  { name: '둥근돌', w: 54, h: 46, grip: 9, speed: 2.9 },
-  { name: '작은돌', w: 40, h: 24, grip: 13, speed: 3.3 },
-];
-function drawStone(g, stone, x, y, angle = 0, tone = '#9a958a') {
-  g.save();
-  g.translate(x, y);
-  g.rotate(angle);
-  g.beginPath();
-  if (stone.wedge) { g.moveTo(-stone.w / 2, stone.h / 2); g.lineTo(stone.w / 2, stone.h / 2); g.lineTo(stone.w * .2, -stone.h / 2); g.lineTo(-stone.w * .32, -stone.h / 2 + 5); g.closePath(); }
-  else if (stone.flat) g.roundRect(-stone.w / 2, -stone.h / 2, stone.w, stone.h, stone.h * .45);
-  else g.ellipse(0, 0, stone.w / 2, stone.h / 2, 0, 0, Math.PI * 2);
-  const shade = g.createLinearGradient(0, -stone.h / 2, 0, stone.h / 2);
-  shade.addColorStop(0, tone);
-  shade.addColorStop(1, '#5d5950');
-  g.fillStyle = shade;
-  g.fill();
-  g.lineWidth = 2;
-  g.strokeStyle = 'rgba(30,26,20,.7)';
-  g.stroke();
-  g.beginPath();
-  g.moveTo(-stone.w * .24, -stone.h * .12);
-  g.quadraticCurveTo(0, -stone.h * .3, stone.w * .22, -stone.h * .16);
-  g.strokeStyle = 'rgba(255,255,255,.22)';
-  g.stroke();
-  g.restore();
+// 1. 물 받기: 반투명한 조롱박을 물줄기 아래에 대고, 붉은 선까지 차면 뺀다
+const GOURD_PROFILE = [[0, 0], [.07, .01], [.112, .04], [.13, .1], [.12, .16], [.085, .21], [.052, .25], [.054, .28], [.068, .32], [.062, .36], [.042, .39], [.03, .41], [.032, .42]];
+const GOURD_LOW = .014, GOURD_HIGH = .405;
+let gourdOutline = null;
+function gourdShape() {
+  gourdOutline ??= new THREE.SplineCurve(GOURD_PROFILE.map(([r, y]) => new THREE.Vector2(r, y))).getPoints(64);
+  return gourdOutline;
 }
-function playStack(site) {
-  const view = document.createElement('canvas'), picks = document.createElement('div'), g = view.getContext('2d'), center = 160, top = 150;
-  view.width = 320;
-  view.height = 262;
-  view.className = 'stack-view';
-  picks.className = 'stone-picks';
-  const layers = [[0, 248, 150, 26], [0, 224, 132, 24], [2, 201, 114, 23], [-2, 180, 96, 21], [1, 161, 74, 19]];
-  let stone = null, phase = 'pick', t = 0, x = center, y = 44, vy = 0, tilt = 0, after = 0, last = 0;
-  const scene = () => {
-    const sky = g.createLinearGradient(0, 0, 0, view.height);
-    sky.addColorStop(0, '#9cc3dc');
-    sky.addColorStop(1, '#e9e3d2');
-    g.fillStyle = sky;
-    g.fillRect(0, 0, view.width, view.height);
-    g.fillStyle = '#6f7d52';
-    g.fillRect(0, 252, view.width, 10);
-    // 사람 키의 80%쯤 쌓인 돌탑
-    layers.forEach(([dx, cy, w, h], i) => drawStone(g, { w, h, flat: i % 2 === 0 }, center + dx, cy, (i % 2 ? -.03 : .04), '#8d887c'));
-    if (stone) drawStone(g, stone, x, y, tilt);
-    if (phase === 'swing') { g.strokeStyle = 'rgba(255,255,255,.5)'; g.setLineDash([4, 6]); g.beginPath(); g.moveTo(x, y + stone.h / 2 + 4); g.lineTo(x, top - 4); g.stroke(); g.setLineDash([]); }
+function gourdRadius(y) {
+  const pts = gourdShape();
+  for (let i = 1; i < pts.length; i++) if (pts[i].y >= y) { const a = pts[i - 1], b = pts[i], t = (y - a.y) / Math.max(1e-6, b.y - a.y); return lerp(a.x, b.x, clamp(t, 0, 1)); }
+  return pts[pts.length - 1].x;
+}
+const gourdHeight = level => lerp(GOURD_LOW, GOURD_HIGH, level / 100);
+function gourdWater(site, level) {
+  const mesh = site.gourdWaterMesh;
+  if (!mesh) return;
+  mesh.geometry.dispose();
+  if (level <= .2) { mesh.geometry = new THREE.BufferGeometry(); return; }
+  const top = gourdHeight(level), pts = [new THREE.Vector2(0, GOURD_LOW)];
+  for (const p of gourdShape()) if (p.y > GOURD_LOW && p.y < top) pts.push(new THREE.Vector2(p.x * .9, p.y));
+  pts.push(new THREE.Vector2(gourdRadius(top) * .9, top), new THREE.Vector2(0, top));
+  mesh.geometry = new THREE.LatheGeometry(pts, 32);
+}
+function gourdLine(site, target) {
+  const ring = site.gourdRing;
+  if (!ring) return;
+  ring.geometry.dispose();
+  const y = gourdHeight(target);
+  ring.geometry = new THREE.TorusGeometry(gourdRadius(y) + .003, .0035, 6, 56);
+  ring.position.y = y;
+}
+function startGourd(w) {
+  const site = w.site, g = site.model;
+  if (!g || !site.gourd) { endWorldGame(); return; }
+  g.updateMatrixWorld(true);
+  const world = (x, y, z) => g.localToWorld(V(x, y, z));
+  // 등산객은 약수터 왼쪽 앞에 서서 물줄기를 바라본다
+  const stand = world(-.82, 0, .78), spout = world(0, .7, -.08);
+  w.back = { x: player.x, z: player.z, off: player.off, index: player.index };
+  player.x = stand.x;
+  player.z = stand.z;
+  Object.assign(amen, { rootY: groundHeight(stand.x, stand.z) + .02, yaw: Math.atan2(spout.x - stand.x, spout.z - stand.z) });
+  game.view = { pos: world(.3, 1, .95), look: world(-.06, .66, -.04) };
+  if (site.dipper) site.dipper.visible = false;
+  Object.assign(w, { level: 0, under: 0, filling: false, target: Math.round(45 + Math.random() * 40) });
+  const ready = () => {
+    w.level = 0;
+    gourdWater(site, 0);
+    gourdLine(site, w.target);
+    playBar(`조롱박의 붉은 선(${w.target}%)까지 약수를 받아 보세요. 선에서 위아래 5% 안에 멈추면 성공입니다.`, [['시작', go, true], ['지나가기', endWorldGame]]);
   };
-  const loop = now => {
-    const dt = Math.min(.05, (now - last) / 1000);
-    last = now;
-    t += dt;
-    if (phase === 'swing') x = center + Math.sin(t * stone.speed) * 72;
-    else if (phase === 'drop') {
-      vy += 1500 * dt;
-      y += vy * dt;
-      const rest = top - stone.h / 2;
-      if (y >= rest) {
-        y = rest;
-        const offset = x - center;
-        if (Math.abs(offset) <= stone.grip) { phase = 'stay'; settle(true); }
-        else { phase = 'tip'; tilt = 0; vy = 0; }
-      }
-    } else if (phase === 'tip') {
-      // 가운데에서 먼 쪽으로 기울며 미끄러져 떨어진다
-      const side = Math.sign(x - center);
-      tilt += side * dt * 3.2;
-      x += side * dt * 95;
-      if (Math.abs(tilt) > .5) { vy += 1500 * dt; y += vy * dt; }
-      after += dt;
-      if (after > .9) { phase = 'fell'; settle(false); }
-    }
-    scene();
-    if (phase === 'swing' || phase === 'drop' || phase === 'tip') game.raf = requestAnimationFrame(loop);
+  const go = () => {
+    w.filling = true;
+    playBar(`물 0% · 붉은 선 ${w.target}%`, [['멈춤', stop, true]]);
   };
-  const choose = picked => {
-    stone = picked;
-    phase = 'swing';
-    t = Math.random() * 6;
-    y = 44;
-    vy = 0;
-    tilt = 0;
-    after = 0;
-    picks.hidden = true;
-    $('game-note').textContent = `${picked.name}: 좌우로 움직일 때 놓기를 눌러 돌탑 위에 얹으세요.`;
-    gameButtons([['놓기', () => { if (phase === 'swing') { phase = 'drop'; gameButtons([]); } }, true]]);
-    last = performance.now();
-    cancelAnimationFrame(game.raf);
-    game.raf = requestAnimationFrame(loop);
+  const stop = () => {
+    if (!w.filling) return;
+    w.filling = false;
+    const gap = Math.abs(w.level - w.target), ok = gap <= 5 && w.level < 100, first = ok && !site.won;
+    if (first) { site.won = true; gainEnergy(1); }
+    const text = ok ? `성공! 붉은 선과 ${gap.toFixed(1)}% 차이예요.${first ? ' 기운 +1' : ''}` : w.level >= 100 ? '물이 넘쳤어요. 다시 해 볼까요?' : `아쉬워요. 붉은 선과 ${gap.toFixed(1)}% 차이가 났어요.`;
+    playBar(text, ok ? [['계속 오르기', endWorldGame, true], ['한 번 더', retry]] : [['다시 하기', retry, true], ['그만하기', endWorldGame]]);
   };
+  const retry = () => { w.target = Math.round(45 + Math.random() * 40); ready(); };
+  w.click = () => { if (w.main) w.main(); };
+  w.step = dt => {
+    // 시작하면 조롱박이 물줄기 아래로 들어가고, 멈추면 빠진다. 물은 물줄기 아래에서만 찬다
+    w.under = clamp(w.under + (w.filling ? dt : -dt) / .32, 0, 1);
+    const k = smooth(0, 1, w.under);
+    site.gourd.position.set(lerp(-.42, 0, k), lerp(.52, .46, k), lerp(.24, -.08, k));
+    site.gourd.rotation.z = lerp(.28, 0, k);
+    site.gourdStream(k);
+    if (!w.filling || k < .9) return;
+    w.level = Math.min(100, w.level + dt * (24 + w.level * .22));
+    gourdWater(site, w.level);
+    $('play-text').textContent = `물 ${w.level.toFixed(0)}% · 붉은 선 ${w.target}%`;
+    if (w.level >= 100) stop();
+  };
+  ready();
+}
+
+// 2. 돌탑 쌓기: 나무 받침에 놓인 돌 다섯 개 가운데 하나를 골라 실제 돌탑 위에서 흔들다 놓는다
+// size는 실제 크기(m), grip은 가운데에서 이만큼 안에 떨어져야 버티는 거리(m)
+const STONES = [
+  { name: '넓적돌', size: [.32, .07, .26], grip: .095, speed: 2.1 },
+  { name: '긴돌', size: [.4, .06, .15], grip: .08, speed: 2.4 },
+  { name: '쐐기돌', size: [.25, .11, .16], grip: .055, speed: 2.5 },
+  { name: '둥근돌', size: [.17, .15, .16], grip: .03, speed: 2.9 },
+  { name: '작은돌', size: [.13, .08, .11], grip: .045, speed: 3.3 },
+];
+const SWING = .26;
+function stoneGeo(i) {
+  const k = siteParts();
+  if (!k.gameStones) {
+    const wedge = new THREE.Shape([new THREE.Vector2(-1, -1), new THREE.Vector2(1, -1), new THREE.Vector2(.4, 1), new THREE.Vector2(-.64, .8)]);
+    const cut = new THREE.ExtrudeGeometry(wedge, { depth: 1.76, bevelEnabled: true, bevelThickness: .12, bevelSize: .12, bevelSegments: 2, curveSegments: 1 }).translate(0, 0, -.88);
+    k.gameStones = [
+      rockShape({ sx: 1, sy: 1, sz: 1, cuts: 7, seed: 401, detail: 2 }),
+      rockShape({ sx: 1, sy: 1, sz: 1, cuts: 6, seed: 403, detail: 2 }),
+      cut,
+      rockShape({ sx: 1, sy: 1, sz: 1, cuts: 3, seed: 407, detail: 2 }),
+      rockShape({ sx: 1, sy: 1, sz: 1, cuts: 5, seed: 409, detail: 2 }),
+    ];
+  }
+  return k.gameStones[i];
+}
+function stoneMesh(i) {
+  const k = siteParts();
+  k.gameRock ??= rockMaterial(1.35);
+  const [W, H, D] = STONES[i].size, mesh = new THREE.Mesh(stoneGeo(i), k.gameRock);
+  mesh.scale.set(W / 2, H / 2, D / 2);
+  mesh.castShadow = true;
+  mesh.userData.stone = i;
+  return mesh;
+}
+// 돌탑 둘레의 방향: w는 돌탑에서 길 쪽, s는 화면에서 좌우가 되는 쪽
+function stackAxes(site) {
+  const p = trailAt(site.s);
+  let wx = p.x - site.x, wz = p.z - site.z;
+  const l = Math.hypot(wx, wz) || 1;
+  wx /= l;
+  wz /= l;
+  return { wx, wz, sx: -wz, sz: wx };
+}
+const stackHeight = site => (site.added ?? []).reduce((sum, o) => sum + STONES[o.i].size[1] * .9, 0);
+// 성공한 돌을 돌탑 위 제자리에 다시 놓는다(타일을 다시 만들 때)
+function placeAddedStones(site) {
+  let y = 0;
+  for (const o of site.added ?? []) {
+    const mesh = stoneMesh(o.i), H = STONES[o.i].size[1];
+    mesh.position.set(o.ox, y + H / 2, o.oz);
+    mesh.rotation.y = o.yaw;
+    site.stoneGroup.add(mesh);
+    y += H * .9;
+  }
+}
+function startStack(w) {
+  const site = w.site;
+  if (!site.stoneGroup || !site.pickStones) { endWorldGame(); return; }
+  const { wx, wz, sx, sz } = stackAxes(site), base = site.stoneGroup.position;
+  const top = () => base.y + stackHeight(site);
+  // 등산객은 돌탑 왼쪽 앞에 서서 지켜본다
+  const stand = { x: site.x + wx * 1.4 - sx * 1.15, z: site.z + wz * 1.4 - sz * 1.15 };
+  w.back = { x: player.x, z: player.z, off: player.off, index: player.index };
+  player.x = stand.x;
+  player.z = stand.z;
+  Object.assign(amen, { rootY: groundHeight(stand.x, stand.z) + .02, yaw: Math.atan2(site.x - stand.x, site.z - stand.z) });
+  game.view = { pos: V(site.x + wx * 2.5 + sx * .5, top() + .5, site.z + wz * 2.5 + sz * .5), look: V(site.x + sx * .45, top() - .3, site.z + sz * .45) };
+  const yawAlong = Math.atan2(-sz, sx);   // 돌의 폭이 화면 좌우로 놓이게
+  Object.assign(w, { phase: 'pick', stone: null, mesh: null, t: 0, off: 0, y: 0, vy: 0, tilt: 0, after: 0 });
+  const pick = i => {
+    if (w.phase !== 'pick' || !site.pickStones[i]) return;
+    w.stone = STONES[i];
+    w.index = i;
+    w.mesh = site.pickStones[i];
+    w.from = w.mesh.position.clone();
+    w.fromYaw = w.mesh.rotation.y;
+    Object.assign(w, { phase: 'lift', t: 0, clock: Math.random() * 6, vy: 0, tilt: 0, after: 0 });
+    playBar(`${w.stone.name}: 좌우로 움직일 때 놓기를 눌러 돌탑 위에 얹으세요.`, [['놓기', drop, true]]);
+  };
+  const choose = () => {
+    // 아직 돌아가는 중인 돌은 받침 제자리에 바로 놓는다
+    if (w.mesh && w.from) { w.mesh.position.copy(w.from); w.mesh.rotation.set(0, w.fromYaw, 0); w.mesh = null; }
+    w.phase = 'pick';
+    playBar('얹을 돌을 고르세요. 받침 위의 돌을 누르거나 아래 이름을 누르세요.', [...STONES.map((stone, i) => [`${i + 1} ${stone.name}`, () => pick(i)]), ['그만하기', endWorldGame]]);
+  };
+  const drop = () => { if (w.phase === 'swing') { w.phase = 'drop'; playBar('떨어집니다…'); } };
   const settle = ok => {
     const first = ok && !site.won;
     if (first) { site.won = true; gainEnergy(1); }
-    if (ok) addCairnStone(site, stone);
-    $('game-note').textContent = ok ? `성공! ${stone.name}이 단단히 얹혔어요.${first ? ' 기운 +1' : ''}` : '돌이 미끄러져 떨어졌어요. 다른 돌로 해 볼까요?';
-    gameButtons([['다시 하기', reset, !ok], ['그만하기', closeGame, ok]]);
+    playBar(ok ? `성공! ${w.stone.name}이 단단히 얹혔어요.${first ? ' 기운 +1' : ''}` : '돌이 미끄러져 떨어졌어요. 다른 돌로 해 볼까요?', ok ? [['계속 오르기', endWorldGame, true], ['한 번 더', choose]] : [['다시 하기', choose, true], ['그만하기', endWorldGame]]);
   };
-  const reset = () => { stone = null; phase = 'pick'; picks.hidden = false; scene(); $('game-note').textContent = '얹을 돌을 고르세요.'; gameButtons([['그만하기', closeGame]]); };
-  STONES.forEach(item => {
-    const b = document.createElement('button'), icon = document.createElement('canvas');
-    b.type = 'button';
-    b.className = 'tool stone-pick';
-    icon.width = 128;
-    icon.height = 56;
-    drawStone(icon.getContext('2d'), item, 64, 28);
-    b.append(icon, document.createTextNode(item.name));
-    b.addEventListener('click', () => choose(item));
-    picks.append(b);
-  });
-  $('game-stage').replaceChildren(view, picks);
-  reset();
-}
-// 성공한 돌은 실제 돌탑 위에도 얹힌다
-// 그림의 돌 크기(픽셀)를 실제 돌 크기로: 넓적돌은 폭 32 cm, 두께 7 cm쯤
-const stoneThick = stone => stone.h / 288;
-function addCairnStone(site, stone) {
-  (site.added ??= []).push(stone);
-  if (!site.stoneGroup) return;
-  const k = site.added.length - 1, rock = new THREE.Mesh(cairnStone, summitRock);
-  rock.scale.set(stone.w / 600, stone.h / 300, stone.w / 700);
-  rock.position.set((hash3(k, 1, 5) - .5) * .05, site.added.slice(0, k).reduce((sum, o) => sum + stoneThick(o) * .85, 0) + stoneThick(stone) * .42, (hash3(k, 2, 5) - .5) * .05);
-  rock.rotation.y = hash3(k, 3, 5) * 6.283;
-  rock.castShadow = true;
-  site.stoneGroup.add(rock);
+  w.pick = pick;
+  w.click = ray => {
+    if (w.phase === 'swing') { drop(); return; }
+    if (w.phase !== 'pick') return;
+    const hit = ray.intersectObjects(site.pickStones.filter(Boolean), false)[0];
+    if (hit) pick(hit.object.userData.stone);
+  };
+  w.step = dt => {
+    const m = w.mesh;
+    if (!m) return;
+    const H = w.stone.size[1], rest = top() + H / 2, hover = rest + .36;
+    if (w.phase === 'lift') {
+      // 받침에서 돌탑 위로 들어 올린다
+      w.t = Math.min(1, w.t + dt / .5);
+      const k = smooth(0, 1, w.t);
+      m.position.set(lerp(w.from.x, site.x, k), lerp(w.from.y, hover, k) + Math.sin(k * Math.PI) * .25, lerp(w.from.z, site.z, k));
+      m.rotation.set(0, lerp(w.fromYaw, yawAlong, k), 0);
+      if (w.t >= 1) w.phase = 'swing';
+    } else if (w.phase === 'swing') {
+      w.clock += dt;
+      w.off = Math.sin(w.clock * w.stone.speed) * SWING;
+      m.position.set(site.x + sx * w.off, hover, site.z + sz * w.off);
+    } else if (w.phase === 'drop') {
+      w.vy += 13 * dt;
+      m.position.y -= w.vy * dt;
+      if (m.position.y <= rest) {
+        m.position.y = rest;
+        if (Math.abs(w.off) <= w.stone.grip) {
+          // 버틴 돌은 돌탑의 일부가 된다. 받침에는 같은 돌을 하나 더 놓는다
+          w.phase = 'stay';
+          site.stoneGroup.attach(m);
+          (site.added ??= []).push({ i: w.index, ox: m.position.x, oz: m.position.z, yaw: m.rotation.y });
+          site.pickStones[w.index] = null;
+          site.restock(w.index);
+          w.mesh = null;
+          sound.step?.('stone', .9);
+          settle(true);
+        } else { w.phase = 'tip'; w.vy = 0; w.side = Math.sign(w.off) || 1; }
+      }
+    } else if (w.phase === 'tip') {
+      // 가운데에서 먼 쪽으로 기울며 미끄러져 땅으로 떨어진다
+      const turn = dt * 3.4 * w.side;
+      w.tilt += Math.abs(turn);
+      m.rotateOnWorldAxis(V(wx, 0, wz), -turn);
+      const ground = groundHeight(m.position.x, m.position.z) + H / 2;
+      if (m.position.y > ground + .01) {
+        m.position.x += sx * w.side * dt * .55;
+        m.position.z += sz * w.side * dt * .55;
+      }
+      if (w.tilt > .55) {
+        w.vy += 11 * dt;
+        m.position.y = Math.max(groundHeight(m.position.x, m.position.z) + H / 2, m.position.y - w.vy * dt);
+      }
+      w.after += dt;
+      if (w.after > 1.3) {
+        w.phase = 'back';
+        w.t = 0;
+        w.fell = m.position.clone();
+        settle(false);
+      }
+    } else if (w.phase === 'back') {
+      // 떨어진 돌은 받침 제자리로 돌려놓는다
+      w.t = Math.min(1, w.t + dt / .6);
+      const k = smooth(0, 1, w.t);
+      m.position.lerpVectors(w.fell, w.from, k);
+      m.position.y += Math.sin(k * Math.PI) * .3;
+      if (w.t >= 1) { m.rotation.set(0, w.fromYaw, 0); m.position.copy(w.from); w.mesh = null; }
+    }
+  };
+  choose();
 }
 
 // 3. 동물사진관: 기운으로 도토리를 받고, 밥그릇에 넣으면 동물이 와서 먹고 함께 사진을 찍는다
@@ -5520,11 +5663,13 @@ function studioLayout(site, kind) {
   const ax = -wz, az = wx;
   return {
     bowl, wx, wz,
-    stand: { x: bowl.x + ax * 1.05 + wx * .3, z: bowl.z + az * 1.05 + wz * .3 },
+    seat: { x: bowl.x + ax * 1 + wx * .2, z: bowl.z + az * 1 + wz * .2 },
+    stand: { x: bowl.x + ax * 1 + wx * .8, z: bowl.z + az * 1 + wz * .8 },
     eat: { x: bowl.x - ax * reach, z: bowl.z - az * reach },
     from: { x: bowl.x - ax * (reach + 6) - wx * 3, z: bowl.z - az * (reach + 6) - wz * 3 },
   };
 }
+const STUDIO_SEAT = .42, STUDIO_EAT = 10;
 function startStudio(site) {
   const kinds = [...ANIMALS, ...MYTHS.filter(k => !k.flies)], kind = kinds[Math.floor(Math.random() * kinds.length)], beast = pool.get(kind.id);
   if (beast.active) { beast.retire(); const i = beasts.indexOf(beast); if (i >= 0) beasts.splice(i, 1); }
@@ -5545,7 +5690,11 @@ function stepPhotoStudio(dt) {
     const gap = Math.hypot(spot.stand.x - player.x, spot.stand.z - player.z);
     if (gap > .45 && state.walkPoint && st.clock < 8) return;
     walkTo(null);
-    Object.assign(amen, { hold: true, rootY: groundHeight(player.x, player.z) + .02, yaw: Math.atan2(spot.bowl.x - player.x, spot.bowl.z - player.z) });
+    // 그루터기에 앉아 밥그릇 쪽을 본다
+    player.x = spot.seat.x;
+    player.z = spot.seat.z;
+    Object.assign(amen, { hold: true, rootY: groundHeight(spot.seat.x, spot.seat.z), yaw: Math.atan2(spot.bowl.x - spot.seat.x, spot.bowl.z - spot.seat.z) });
+    player.act = { kind: 'sit', seat: STUDIO_SEAT };
     beast.place({ x: spot.from.x, z: spot.from.z, aim: null, mode: 'graze', clock: 999, life: 999 });
     beast.met = true;
     beast.tame = { phase: 'come', clock: 0, x: spot.eat.x, z: spot.eat.z, face: Math.atan2(spot.bowl.x - spot.eat.x, spot.bowl.z - spot.eat.z) };
@@ -5558,15 +5707,16 @@ function stepPhotoStudio(dt) {
   } else if (st.phase === 'wait') {
     if (beast.tame.phase === 'eat') Object.assign(st, { phase: 'eat', clock: 0 });
   } else if (st.phase === 'eat') {
-    // 도토리를 하나씩 먹는다
-    const left = Math.max(0, 5 - Math.floor(st.clock / .8));
+    // 10초 동안 도토리를 하나씩 먹는다. 등산객은 그루터기에 앉아 지켜본다
+    const left = Math.max(0, 5 - Math.floor(st.clock / (STUDIO_EAT / 5)));
     st.site.acornMeshes?.forEach((m, i) => { m.visible = i < left; });
-    if (st.clock > 4.3) {
+    if (st.clock > STUDIO_EAT) {
       st.cam = studioCamera(st);
       Object.assign(st, { phase: 'pose', clock: 0 });
       Object.assign(beast.tame, { phase: 'pose', camX: st.cam.x, camZ: st.cam.z });
-      amen.yaw = Math.atan2(st.cam.x - player.x, st.cam.z - player.z);
-      player.act = { kind: 'cheer' };
+      // 앉은 채로 사진기 쪽으로 반쯤 돌아본다
+      const toBowl = Math.atan2(spot.bowl.x - player.x, spot.bowl.z - player.z), toCam = Math.atan2(st.cam.x - player.x, st.cam.z - player.z);
+      amen.yaw = toBowl + angleGap(toBowl, toCam) * .5;
     }
   } else if (st.phase === 'pose' && st.clock > 1.5) {
     const url = takeStudioPhoto(st), id = `animal-${Date.now()}`;
@@ -5590,6 +5740,13 @@ function stepPhotoStudio(dt) {
     game.site = null;
     amen.hold = false;
     player.act = null;
+    // 그루터기에서 일어나 앞으로 나선다
+    player.x = spot.stand.x;
+    player.z = spot.stand.z;
+    player.y = groundHeight(spot.stand.x, spot.stand.z);
+    const hit = nearWindow(player.x, player.z, player.index);
+    player.index = hit.i;
+    player.off = Math.min(hit.d, OFF_TRAIL);
     resumeAuto();
   }
 }
@@ -5803,6 +5960,24 @@ Object.assign(SITE_BUILD, {
   gourdGame(tile, site) {
     site.board = '물 받기 약수터';
     SITE_BUILD.spring(tile, site);
+    const k = siteParts();
+    k.gourdShell ??= new THREE.LatheGeometry(gourdShape(), 40);
+    k.gourdSkin ??= new THREE.MeshPhongMaterial({ color: '#efd593', specular: '#6b5a3a', shininess: 38, transparent: true, opacity: .42, side: THREE.DoubleSide, depthWrite: false });
+    k.gourdWaterMat ??= new THREE.MeshPhongMaterial({ color: '#5ab6de', emissive: '#0f3a4c', specular: '#ffffff', shininess: 90, transparent: true, opacity: .86 });
+    k.gourdLineMat ??= new THREE.MeshBasicMaterial({ color: '#e0412a' });
+    k.gourdCord ??= new THREE.TorusGeometry(.056, .007, 6, 28).rotateX(Math.PI / 2);
+    const gourd = new THREE.Group(), shell = new THREE.Mesh(k.gourdShell, k.gourdSkin), water = new THREE.Mesh(new THREE.BufferGeometry(), k.gourdWaterMat), ring = new THREE.Mesh(new THREE.BufferGeometry(), k.gourdLineMat), cord = new THREE.Mesh(k.gourdCord, woodMat);
+    ring.rotation.x = Math.PI / 2;
+    cord.position.y = .262;
+    shell.renderOrder = 2;
+    water.renderOrder = 1;
+    gourd.add(water, shell, ring, cord);
+    gourd.position.set(-.42, .52, .24);
+    gourd.rotation.z = .28;
+    site.model.add(gourd);
+    Object.assign(site, { gourd, gourdWaterMesh: water, gourdRing: ring });
+    gourdLine(site, 65);
+    tile.owned.push({ dispose: () => { water.geometry.dispose(); ring.geometry.dispose(); } });
   },
   stackGame(tile, site) {
     siteParts();
@@ -5812,13 +5987,26 @@ Object.assign(SITE_BUILD, {
     site.stoneGroup = new THREE.Group();
     site.stoneGroup.position.set(site.x, floor + .12 + rows.reduce((sum, r) => sum + r[2] * .62, 0), site.z);
     tile.group.add(site.stoneGroup);
-    const spots = STONES.map((stone, i) => { const a = site.yaw + 1.9 + i * .38, x = site.x + Math.sin(a) * 1.5, z = site.z + Math.cos(a) * 1.5; return [x, groundHeight(x, z) + .02, z, stone.w / 260]; });
-    strewRocks(tile, spots);
-    gameSign(tile, site, '돌탑 쌓기');
-    tile.colliders.push({ x: site.x, z: site.z, r: 1.1, cam: 0 });
-    const done = site.added ?? [];
-    site.added = [];
-    done.forEach(stone => addCairnStone(site, stone));
+    const { wx, wz, sx, sz } = stackAxes(site), shelf = { x: site.x + sx * 1.05 + wx * .2, z: site.z + sz * 1.05 + wz * .2 }, shelfFloor = groundHeight(shelf.x, shelf.z);
+    const stand = new THREE.Group();
+    solid(stand, boxOf2(1.42, .07, .46), woodMat, 0, .7, 0);
+    for (const d of [-.56, .56]) solid(stand, rodOf(.07, .08, .68, 8), woodMat, d, .34, 0);
+    stand.position.set(shelf.x, shelfFloor, shelf.z);
+    stand.rotation.y = Math.atan2(-sz, sx);
+    tile.group.add(stand);
+    site.pickStones = [];
+    site.restock = i => {
+      const mesh = stoneMesh(i), along = (i - 2) * .27;
+      mesh.position.set(shelf.x + sx * along, shelfFloor + .735 + STONES[i].size[1] / 2, shelf.z + sz * along);
+      // 쐐기돌은 비스듬한 면이 보이게 돌려 놓는다
+      mesh.rotation.y = i === 2 ? Math.atan2(-sz, sx) : Math.atan2(-wz, wx);
+      tile.group.add(mesh);
+      site.pickStones[i] = mesh;
+    };
+    STONES.forEach((_, i) => site.restock(i));
+    gameSign(tile, site, '돌탑 쌓기', 2.1, -.9);
+    tile.colliders.push({ x: site.x, z: site.z, r: 1.1, cam: 0 }, { x: shelf.x, z: shelf.z, r: .62, cam: 0 });
+    placeAddedStones(site);
   },
   photoStudio(tile, site) {
     siteParts();
@@ -5845,6 +6033,16 @@ Object.assign(SITE_BUILD, {
     tile.owned.push(bowlShape, bowlMat, nutMat, capMat);
     site.bowl = { x: site.x, y: (site.pad ? site.y : groundHeight(site.x, site.z)) + .3, z: site.z };
     tile.colliders.push({ x: site.x, z: site.z, r: .36, cam: 0 });
+    // 동물이 먹는 동안 앉아서 지켜볼 그루터기
+    const k = siteParts(), seat = studioLayout(site, { length: 0 }).seat;
+    k.stumpGeo ??= rodOf(1, 1.08, 1, 14);
+    k.stump ??= [new THREE.MeshLambertMaterial({ color: '#6a4c34' }), new THREE.MeshLambertMaterial({ map: ringTexture() }), new THREE.MeshLambertMaterial({ color: '#6a4c34' })];
+    const stool = new THREE.Mesh(k.stumpGeo, k.stump);
+    stool.position.set(seat.x, groundHeight(seat.x, seat.z) + STUDIO_SEAT / 2 - .03, seat.z);
+    stool.scale.set(.2, STUDIO_SEAT + .03, .2);
+    stool.castShadow = true;
+    stool.receiveShadow = true;
+    tile.group.add(stool);
   },
   leafGame(tile, site) {
     const k = leafWallKit();
@@ -5872,7 +6070,10 @@ function resetAmenities() {
   amen.visits.clear();
   amen.hinted.clear();
   if (player) player.act = null;
-  for (const id of ['meet', 'rest-end', 'rest-fx', 'drink', 'game']) $(id).hidden = true;
+  for (const id of ['meet', 'rest-end', 'rest-fx', 'drink', 'game', 'play-bar']) $(id).hidden = true;
+  document.body.classList.remove('playing');
+  game.world = null;
+  game.view = null;
   clearTimeout(meetTimer);
   cancelAnimationFrame(game.raf);
   if (game.studio) game.studio.beast.tame = null;
@@ -6029,6 +6230,7 @@ function stepAmenities(dt) {
   if (!trail?.sites || state.mode !== 'hike') return;
   if (amen.photo) { stepSummitPhoto(dt); return; }
   if (game.studio) { stepPhotoStudio(dt); return; }
+  if (game.world) { game.world.step?.(dt); return; }
   if (game.site) return;
   if (amen.act === 'drink') {
     amen.clock += dt;
@@ -6065,7 +6267,7 @@ function stepAmenities(dt) {
         amen.visits.add(site);
         pauseAuto();
         faceSite(site);
-        openGame(site);
+        (WORLD_GAMES.has(site.kind) ? startWorldGame : openGame)(site);
         return;
       }
       continue;
@@ -6436,11 +6638,14 @@ Object.assign(SITE_BUILD, {
     const pipe = solid(g, rodOf(.045, .045, .95, 8), k.bamboo, 0, .98, -.55);
     pipe.rotation.x = 1.36;
     k.stream ??= new THREE.MeshBasicMaterial({ color: '#d7f0f7', transparent: true, opacity: .75 });
-    solid(g, rodOf(.018, .028, .54, 6), k.stream, 0, .74, -.08).castShadow = false;
+    const stream = solid(g, rodOf(.018, .028, .54, 6), k.stream, 0, .74, -.08);
+    stream.castShadow = false;
+    site.gourdStream = under => { const len = 1.01 - lerp(.47, .9, under); stream.scale.y = len / .54; stream.position.y = 1.01 - len / 2; };
     // 물받이 가장자리에 조롱박 바가지
     k.gourd ??= gourdDipper();
     k.gourdMat ??= new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     const dipper = solid(g, k.gourd, k.gourdMat, .38, .5, .3);
+    site.dipper = dipper;
     dipper.rotation.set(0, -.7, -.12);
     const post = new THREE.Group();
     solid(post, POST, woodMat, 0, .97, 0);
@@ -6448,7 +6653,7 @@ Object.assign(SITE_BUILD, {
     post.position.set(1.15, 0, .35);
     post.rotation.y = -.3;
     g.add(post);
-    setDown(tile, g, site);
+    site.model = setDown(tile, g, site);
     tile.colliders.push({ x: site.x, z: site.z, r: .72, cam: 0 });
   },
   cairn(tile, site) {
@@ -9056,8 +9261,9 @@ function bindControls() {
     pointers.delete(e.pointerId);
     if (pano.on) { if (e.type === 'pointerup') pano.leaving = true; drag = null; return; }
     if (e.type === 'pointerup' && drag && !drag.moved && state.mode === 'hike') {
-      const flower = flowerAt(e.clientX, e.clientY);
-      if (flower) openFlora(flower.id);
+      const flower = game.world ? null : flowerAt(e.clientX, e.clientY);
+      if (game.world) worldClick(e.clientX, e.clientY);
+      else if (flower) openFlora(flower.id);
       else if (!amen.hold || (amen.act === 'sit' && (endRest(), true))) walkToPicked(pickGround(e.clientX, e.clientY));
     }
     if (pointers.size < 2) pinch = 0;
@@ -9078,6 +9284,12 @@ function bindControls() {
     }
     if (!$('promo').hidden) { if (e.code === 'Escape') closePromo(); return; }
     if (!$('game').hidden) { if (e.code === 'Escape') closeGame(); return; }
+    if (game.world) {
+      if (e.code === 'Escape') endWorldGame();
+      else if (e.code === 'Space' && !e.repeat && document.activeElement?.tagName !== 'BUTTON') { e.preventDefault(); game.world.main?.(); }
+      else if (/^Digit[1-5]$/.test(e.code)) game.world.pick?.(+e.code.slice(5) - 1);
+      return;
+    }
     if (game.studio) return;
     if (state.mode === 'intro' && e.code === 'Escape' && !$('map-panel').classList.contains('mini')) sizeMap(false);
     if (state.mode !== 'hike') return;
@@ -10077,6 +10289,7 @@ function stepPanorama(dt) {
 /* ---------- 카메라, HUD ---------- */
 function updateCamera(dt) {
   if (pano.on) { stepPanorama(dt); return; }
+  if (game.view) { stepGameView(dt); return; }
   cam.hold = Math.max(0, cam.hold - dt);
   if (cam.face !== undefined) {
     if (cam.hold > 0) cam.yaw += angleGap(cam.yaw, cam.face) * (1 - Math.exp(-dt * 3.2));
@@ -10684,7 +10897,7 @@ async function boot() {
       return { medianMs: +times[n >> 1].toFixed(1), worstMs: +times[n - 1].toFixed(1), pixelRatio: renderer.getPixelRatio(), size: [innerWidth, innerHeight] };
     },
     colliders() { collectColliders(player.x, player.z, 11); return around.slice(); },
-    HD, pano, togglePanorama, groundHeight, game, GAMES, openGame, closeGame, startStudio, summitWords, scenery, sceneView: () => farland?.view, sites: () => trail.sites, amen: () => amen, beginSite: begin, endRest, summitPhoto, stoneSpot: () => stoneSpot, streams: () => trail.streams, spans: () => trail.spans, stonePose: () => ({ x: stoneSpot.x, z: stoneSpot.z, floor: stoneSpot.y, cairn: cairnSpot }), cloudOpacity: () => cloudSea?.material.opacity ?? 0, record, openBook, closeBook, replaySummit, portraitOf, saveBook, MYTHS, wild: { bugs, beasts, INSECTS, ANIMALS, Beast, addBug, addBeast, clearWild, step: stepWild, clock: wildClock, unseen },
+    HD, pano, togglePanorama, groundHeight, game, GAMES, openGame, closeGame, startStudio, startWorldGame, endWorldGame, STONES, summitWords, scenery, sceneView: () => farland?.view, sites: () => trail.sites, amen: () => amen, beginSite: begin, endRest, summitPhoto, stoneSpot: () => stoneSpot, streams: () => trail.streams, spans: () => trail.spans, stonePose: () => ({ x: stoneSpot.x, z: stoneSpot.z, floor: stoneSpot.y, cairn: cairnSpot }), cloudOpacity: () => cloudSea?.material.opacity ?? 0, record, openBook, closeBook, replaySummit, portraitOf, saveBook, MYTHS, wild: { bugs, beasts, INSECTS, ANIMALS, Beast, addBug, addBeast, clearWild, step: stepWild, clock: wildClock, unseen },
     openFlora, refreshHud, checkPlaces, updateFlowerTag, flowerTarget: () => flowerNear, flora: FLORA, plantKinds: () => kinds, tilesFlowers: () => [...tiles.values()].flatMap(t => t.flowers),
     stats() {
       let instances = 0, ready = 0;
