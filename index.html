@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="description" content="실제 등산로로 우리나라 100대 명산 99곳을 오르는 3D 등산 체험"><meta property="og:title" content="산봉우리 온라인"><meta property="og:description" content="실제 등산로로 우리나라 100대 명산 99곳을 오르는 3D 등산 체험"><meta property="og:type" content="website"><meta property="og:image" content="media/intro.jpg"><style>[hidden]{display:none!important}</style></head><body><meta charset="utf-8">
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="description" content="블랙야크 100대 명산을 실제 등산로로 오르는 3D 등산 체험"><meta property="og:title" content="산봉우리 온라인"><meta property="og:description" content="블랙야크 100대 명산을 실제 등산로로 오르는 3D 등산 체험"><meta property="og:type" content="website"><meta property="og:image" content="media/intro.jpg"><style>[hidden]{display:none!important}</style></head><body><meta charset="utf-8">
 <title>산봉우리 온라인</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -615,7 +615,7 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
       </div>
     </div>
     <p class="keys" id="keys">WASD·방향키로 걷기, 바닥 클릭으로 그 지점까지 걷기, 오른쪽 버튼을 누른 채 움직여 시점 바꾸기, 스페이스로 자동 등산, P로 파노라마, B로 도감.</p>
-    <p class="credit">등산로와 노면 자료: 한국등산트레킹지원센터, <a href="https://www.data.go.kr/data/15098177/fileData.do">공공데이터포털</a>, 한국관광공사 TourAPI 사용</p>
+    <p class="credit">등산로와 노면 자료: 한국등산트레킹지원센터, <a href="https://www.data.go.kr/data/15098177/fileData.do">공공데이터포털</a>, 한국관광공사 TourAPI, <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap 기여자</a> 사용 · 표고: NASA SRTM</p>
   </div>
   <aside class="creator" aria-labelledby="creator-title">
     <h2 id="creator-title">캐릭터 만들기</h2>
@@ -850,6 +850,8 @@ function describeTrail(data) {
   readSpans(t);
   for (const run of t.runs) t.surface.fill(SURFACE[run.kind] ?? 0, Math.round(run.a / t.ds), Math.min(n + 1, Math.round(run.b / t.ds)));
   t.water = (data.water ?? []).map(([s, d]) => ({ s: s * t.scale, d }));
+  // 길에서 조금 떨어진 이름난 곳(봉우리, 절, 약수터 등)은 코스 지도에만 그 자리에 표시한다
+  t.marks = (data.marks ?? []).map(([x, z, label, kind]) => ({ x, z, label, kind }));
   t.named = t.pois.filter(poi => poi.named);
 
   // 바뀌는 곳이 부드럽게 섞이도록 노면과 바닥 비율을 경로를 따라 흐리게 한다
@@ -4523,8 +4525,10 @@ const SITE_RULES = [
   ['tree', /소나무|노송|주목|고사목|연리지|모과나무|느티나무/],
   ['stream', /계곡|계류|합수곡|용소|구곡|[0-9]곡|저수지|호수|연못|[가-힣]못$|[가-힣]담$|[가-힣]탕$|[가-힣]천$|(?<!휴게|분|숙|지|무|초)소$/],
 ];
+// 갈림길 이정표가 다른 곳을 가리키면(예: '도솔봉 1.2km') 그 이름을 이 자리의 장소로 여기지 않는다
+const pointsAway = poi => poi.kind === 'sign' && /\s[\d.]+k?m$/.test(poi.label);
 function siteKind(poi) {
-  if (poi.kind === 'danger') return null;
+  if (poi.kind === 'danger' || pointsAway(poi)) return null;
   if (SITE_SKIP.test(poi.label) && poi.kind !== 'rest') return poi.kind === 'view' ? 'deck' : null;
   for (const [kind, rule] of SITE_RULES) if (rule.test(poi.label)) return kind;
   return poi.kind === 'spring' ? 'spring' : poi.kind === 'rest' ? 'rest' : poi.kind === 'view' ? 'deck' : null;
@@ -5655,7 +5659,7 @@ function playStudio(site) {
 }
 // 밥그릇 둘레의 자리: 등산객은 그릇 옆, 동물은 맞은편, 사진기는 길 쪽에 둔다
 function studioLayout(site, kind) {
-  const bowl = site.bowl ?? { x: site.x, y: groundHeight(site.x, site.z) + .55, z: site.z }, p = trailAt(site.s);
+  const bowl = site.bowl ?? { x: site.x, y: groundHeight(site.x, site.z) + .08, z: site.z }, p = trailAt(site.s);
   let wx = p.x - bowl.x, wz = p.z - bowl.z;
   const wl = Math.hypot(wx, wz) || 1, reach = Math.max(.5, kind.length * .55 + .3);
   wx /= wl;
@@ -5697,7 +5701,10 @@ function stepPhotoStudio(dt) {
     player.act = { kind: 'sit', seat: STUDIO_SEAT };
     beast.place({ x: spot.from.x, z: spot.from.z, aim: null, mode: 'graze', clock: 999, life: 999 });
     beast.met = true;
-    beast.tame = { phase: 'come', clock: 0, x: spot.eat.x, z: spot.eat.z, face: Math.atan2(spot.bowl.x - spot.eat.x, spot.bowl.z - spot.eat.z) };
+    const ex = spot.eat.x - spot.bowl.x, ez = spot.eat.z - spot.bowl.z, el = Math.hypot(ex, ez) || 1, reach = mouthReach(beast);
+    // 입이 땅까지 닿지 않는 동물은 그 높이만큼 밥그릇을 받침으로 올린다
+    st.lift = clamp(reach.low - .1, 0, .7);
+    beast.tame = { phase: 'come', clock: 0, x: spot.eat.x, z: spot.eat.z, face: Math.atan2(-ex, -ez), maxDip: reach.dip, mouth: { x: spot.bowl.x + ex / el * .05, y: spot.bowl.y, z: spot.bowl.z + ez / el * .05 } };
     beasts.push(beast);
     // 카메라는 길 쪽에서 밥그릇을 바라보게 돌려, 동물이 오는 모습과 먹는 모습이 보이게 한다
     cam.face = Math.atan2(spot.wx, spot.wz);
@@ -5706,7 +5713,13 @@ function stepPhotoStudio(dt) {
     showToast(`${st.kind.name}${st.kind.myth ? '(신비한 동물)' : ''}이(가) 도토리 냄새를 맡고 다가와요`, 3200);
   } else if (st.phase === 'wait') {
     if (beast.tame.phase === 'eat') Object.assign(st, { phase: 'eat', clock: 0 });
-  } else if (st.phase === 'eat') {
+  }
+  // 밥그릇 받침 높이를 동물이 오는 동안 천천히 맞춘다
+  if (st.lift !== undefined && st.site.bowlLift && Math.abs(st.site.lift - st.lift) > .001) {
+    st.site.bowlLift(st.site.lift + clamp(st.lift - st.site.lift, -dt * .6, dt * .6));
+    if (beast.tame?.mouth) beast.tame.mouth.y = st.site.bowl.y;
+  }
+  if (st.phase === 'eat') {
     // 10초 동안 도토리를 하나씩 먹는다. 등산객은 그루터기에 앉아 지켜본다
     const left = Math.max(0, 5 - Math.floor(st.clock / (STUDIO_EAT / 5)));
     st.site.acornMeshes?.forEach((m, i) => { m.visible = i < left; });
@@ -6011,19 +6024,21 @@ Object.assign(SITE_BUILD, {
   photoStudio(tile, site) {
     siteParts();
     const g = new THREE.Group(), bowlMat = new THREE.MeshLambertMaterial({ color: '#9a6a3c' }), nutMat = new THREE.MeshLambertMaterial({ color: '#8a5a2b' }), capMat = new THREE.MeshLambertMaterial({ color: '#5c3d1e' });
-    // 낮은 그루터기 위 나무 밥그릇. 작은 동물도 닿도록 낮게 둔다
-    solid(g, rodOf(.3, .34, .2, 14), woodMat, 0, .1, 0);
+    // 나무 밥그릇은 땅에 두고, 키 큰 동물이 오면 그 입 높이까지 그루터기 받침으로 올린다
+    const dish = new THREE.Group(), stand = solid(g, rodOf(.25, .29, 1, 14), woodMat, 0, 0, 0);
+    stand.visible = false;
+    g.add(dish);
     const bowlShape = new THREE.LatheGeometry([new THREE.Vector2(.02, 0), new THREE.Vector2(.2, .01), new THREE.Vector2(.27, .07), new THREE.Vector2(.28, .13), new THREE.Vector2(.25, .13), new THREE.Vector2(.23, .07), new THREE.Vector2(.02, .04)], 24);
-    solid(g, bowlShape, bowlMat, 0, .2, 0);
+    solid(dish, bowlShape, bowlMat, 0, .005, 0);
     site.acornMeshes = [];
     for (let i = 0; i < 5; i++) {
       const nut = new THREE.Group(), a = i * 1.26, r = i ? .1 : 0;
       solid(nut, acornBody, nutMat, 0, 0, 0);
       solid(nut, acornCap, capMat, 0, .03, 0);
-      nut.position.set(Math.cos(a) * r, .28, Math.sin(a) * r);
+      nut.position.set(Math.cos(a) * r, .08, Math.sin(a) * r);
       nut.rotation.set((hash3(i, 1, 3) - .5) * 1.4, 0, (hash3(i, 2, 3) - .5) * 1.4);
       nut.visible = false;
-      g.add(nut);
+      dish.add(nut);
       site.acornMeshes.push(nut);
     }
     nameBoard(tile, g, '동물사진관', 0, 1.65, -.7, 1.4, .4);
@@ -6031,8 +6046,18 @@ Object.assign(SITE_BUILD, {
     solid(g, POST, woodMat, .55, .97, -.74);
     setDown(tile, g, site);
     tile.owned.push(bowlShape, bowlMat, nutMat, capMat);
-    site.bowl = { x: site.x, y: (site.pad ? site.y : groundHeight(site.x, site.z)) + .3, z: site.z };
-    tile.colliders.push({ x: site.x, z: site.z, r: .36, cam: 0 });
+    const floor = site.pad ? site.y : groundHeight(site.x, site.z);
+    site.bowl = { x: site.x, y: floor + .08, z: site.z };
+    site.lift = 0;
+    site.bowlLift = h => {
+      site.lift = h;
+      stand.visible = h > .02;
+      stand.scale.y = Math.max(h, .001);
+      stand.position.y = h / 2;
+      dish.position.y = h;
+      site.bowl.y = floor + .08 + h;
+    };
+    tile.colliders.push({ x: site.x, z: site.z, r: .3, cam: 0 });
     // 동물이 먹는 동안 앉아서 지켜볼 그루터기
     const k = siteParts(), seat = studioLayout(site, { length: 0 }).seat;
     k.stumpGeo ??= rodOf(1, 1.08, 1, 14);
@@ -7989,7 +8014,33 @@ function makeBeast(kind) {
   }
   return { root, mesh, bones, glow, shade, rest: bones.map(b => b.position.clone()) };
 }
-const WALK_BEAT = [.25, .75, 0, .5], RUN_BEAT = [0, .1, .52, .62];   // 왼앞, 오른앞, 왼뒤, 오른뒤
+const WALK_BEAT = [.25, .75, 0, .5], RUN_BEAT = [0, .1, .52, .62];
+// 고개를 너무 숙이면 머리가 가슴 밑으로 말려 오히려 입이 올라간다. 입이 가장 낮은 숙임과 그 높이를 찾는다
+function mouthReach(beast) {
+  const kind = beast.kind;
+  if (kind.mouthReach) return kind.mouthReach;
+  let best = { dip: 1, low: Infinity };
+  for (const d of [.4, .6, .8, 1, 1.2, 1.4, 1.6, 1.8, 2.1, 2.4]) {
+    for (let i = 0; i < 40; i++) { beast.animate(.03, 0, kind.nibble * d, 0, 0, 0); beast.pose(.03); }
+    const low = beast.nose().y - beast.root.position.y;
+    if (low < best.low) best = { dip: d, low };
+  }
+  beast.down = 0;
+  return kind.mouthReach = best;
+}
+// 머리뼈에 주로 붙은 꼭짓점 가운데 가장 앞쪽(뿔처럼 머리 위로 솟은 것은 빼고)을 코끝으로 본다
+const noseAt = new THREE.Vector3();
+function noseTipOf(kind) {
+  const { geometry: g, rig } = kind.parts, pos = g.attributes.position, idx = g.attributes.skinIndex, wt = g.attributes.skinWeight, head = rig[BONE.head].p;
+  let best = null;
+  for (let i = 0; i < pos.count; i++) {
+    let bone = -1, w = 0;
+    for (let c = 0; c < 4; c++) { const v = wt.getComponent(i, c); if (v > w) { w = v; bone = idx.getComponent(i, c); } }
+    if (bone !== BONE.head || pos.getY(i) > head[1] + kind.length * .05) continue;
+    if (!best || pos.getZ(i) > best.z) best = { x: pos.getX(i), y: pos.getY(i), z: pos.getZ(i) };
+  }
+  return best ? new THREE.Vector3(best.x - head[0], best.y - head[1], best.z - head[2]) : new THREE.Vector3(0, 0, kind.length * .2);
+}   // 왼앞, 오른앞, 왼뒤, 오른뒤
 
 class Beast {
   sit = 0; power = 1; near = []; senseClock = 0; x = 0; y = 0; z = 0; yaw = 0; pitch = 0; rear = 0; cycle = 0; swing = 0; gait = 0; down = 0; turn = 0; perk = 0; earClock = 2; flick = 0; flickEar = BONE.earL; seed = Math.random() * 6; active = false;
@@ -8282,6 +8333,12 @@ class Beast {
     this.checkClock = .25;
     return gap > (kind.big ? 110 : 45) || (this.clock < 0 && (this.clock < -7 || unseen(this.x, this.y + .3, this.z)));
   }
+  // 입 끝(코끝)의 세상 위치. 머리뼈에 붙은 꼭짓점 가운데 가장 앞쪽을 코스마다 한 번 찾아 둔다
+  nose() {
+    const tip = this.kind.noseTip ??= noseTipOf(this.kind);
+    this.root.updateMatrixWorld(true);
+    return this.bones[BONE.head].localToWorld(noseAt.copy(tip));
+  }
   // 동물사진관: 밥그릇으로 걸어와 도토리를 먹고, 사진기 쪽으로 고개를 돌린다
   tamed(dt) {
     const { kind } = this, t = this.tame;
@@ -8299,7 +8356,16 @@ class Beast {
       }
     } else {
       this.yaw += angleGap(this.yaw, t.face) * (1 - Math.exp(-dt * 4));
-      if (t.phase === 'eat') down = kind.nibble;
+      if (t.phase === 'eat') {
+        t.dip ??= 1;
+        down = kind.nibble * t.dip;
+        if (t.mouth) {
+          const nose = this.nose(), fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), ahead = (t.mouth.x - nose.x) * fx + (t.mouth.z - nose.z) * fz, k = 1 - Math.exp(-dt * 3);
+          this.x += fx * ahead * k;
+          this.z += fz * ahead * k;
+          t.dip = clamp(t.dip + (nose.y - t.mouth.y) * dt * 5, .3, t.maxDip ?? 1.8);
+        }
+      }
       else { perk = .7; turn = clamp(angleGap(this.yaw, Math.atan2(t.camX - this.x, t.camZ - this.z)), -1.1, 1.1); }
     }
     this.rear = lerp(this.rear, 0, 1 - Math.exp(-dt * 9));
@@ -9534,7 +9600,9 @@ async function backToStart() {
 let catalog = [], openToken = 0, bundle = null;
 // 한라산 관음사 코스를 정상을 기준으로 줄인 10분짜리 체험 코스(tools/build_trial.py로 만든다). 지도에는 없다
 const TRIAL = { id: 'trial', name: '한라산', label: '한라산 체험 코스', summit: '한라산 백록담', top: 1946 };
-const courseRow = id => catalog.find(row => row.id === id) ?? (id === TRIAL.id ? TRIAL : null);
+// 지도 목록에 없는 시험 코스는 주소(?course=b001)로만 고른다
+const extraCourses = [];
+const courseRow = id => catalog.find(row => row.id === id) ?? extraCourses.find(row => row.id === id) ?? (id === TRIAL.id ? TRIAL : null);
 
 // 파일을 더블클릭해 열면 브라우저가 fetch를 막으므로, 스크립트로 묶어 둔 자료를 대신 읽는다
 function loadBundle() {
@@ -10417,7 +10485,7 @@ function refreshHud() {
   $('clock').textContent = clockText(player.arrivedAt ?? state.elapsed);
   const next = trail.pois.find(poi => poi.s > player.s + 2);
   $('next-poi').textContent = player.off > 2.6 ? `등산로에서 ${Math.round(player.off)} m 벗어남`
-    : next ? `다음 ${next.label} ${Math.round(next.s - player.s)} m` : `다음 ${course.summit} ${Math.round(left)} m`;
+    : next ? `다음 ${pointsAway(next) ? '갈림길' : next.label} ${Math.round(next.s - player.s)} m` : `다음 ${course.summit} ${Math.round(left)} m`;
   $('stamina-value').textContent = Math.round(player.stamina);
   $('energy-value').textContent = record.energy ?? 0;
   $('speed-value').textContent = (player.speed * gradeSpeed(player.grade)).toFixed(1);
@@ -10605,6 +10673,7 @@ function drawProfile() {
 
 /* ---------- 코스 지도: 실제 GPS 경로와 주변 지형을 한 번 그려 두고 현재 위치만 덧그린다 ---------- */
 const MAP_SIZE = 520, MAP_PAD = 46;
+const NEAR_MARK = { peak: ['봉', '#6a7f45'], temple: ['절', '#b0562c'], fall: ['폭', '#2f8fd0'], spring: ['샘', '#2f8fd0'], deck: ['전', '#d08a1e'], rock: ['바', '#6f6f68'], rest: ['쉼', '#3f8a58'], stele: ['비', '#8a6a3a'], cave: ['굴', '#6f6f68'] };
 const MAP_MARK = { fall: ['폭', '#2f8fd0', '폭포'], pool: ['소', '#2f8fd0'], spring: ['샘', '#2f8fd0'], temple: ['절', '#b0562c'], pagoda: ['탑', '#8a6a3a'], stupa: ['탑', '#8a6a3a'], stele: ['비', '#8a6a3a'], statue: ['불', '#8a6a3a'], pavilion: ['정', '#3f8a58'], cabin: ['산', '#3f8a58'], deck: ['전', '#d08a1e'], rest: ['쉼', '#3f8a58'], cairn: ['돌', '#7a6a52'], sangu: ['꾸', '#d0602a'], rock: ['바', '#6f6f68'], cave: ['굴', '#6f6f68'], gate: ['문', '#9a4a4a'], wall: ['성', '#9a4a4a'], bridge: ['다', '#7a5a9a'] };
 let courseMap = null;
 function buildCourseMap() {
@@ -10715,6 +10784,40 @@ function buildCourseMap() {
       g.strokeText(text, left, top + 18);
       g.fillStyle = '#fff';
       g.fillText(text, left, top + 18);
+      break;
+    }
+  }
+  // 길 둘레의 이름난 곳: 길 위 장소보다 작고 옅게, 자리가 비는 곳에만 이름을 적는다
+  for (const mark of trail.marks ?? []) {
+    const [letter, color] = NEAR_MARK[mark.kind] ?? NEAR_MARK.peak, x = toX(mark.x), y = toY(mark.z);
+    if (x < 10 || y < 10 || x > MAP_SIZE - 10 || y > MAP_SIZE - 10) continue;
+    g.globalAlpha = .9;
+    g.beginPath();
+    g.arc(x, y, 10, 0, 7);
+    g.fillStyle = color;
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = 'rgba(255, 255, 255, .9)';
+    g.stroke();
+    g.font = `800 12px ${tok('--ui')}`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = '#fff';
+    g.fillText(letter, x, y + 1);
+    g.textBaseline = 'alphabetic';
+    g.globalAlpha = 1;
+    g.font = `600 15px ${tok('--ui')}`;
+    const wide = g.measureText(mark.label).width;
+    for (const [left, top] of [[x + 13, y - 9], [x - 13 - wide, y - 9], [x - wide / 2, y - 30], [x - wide / 2, y + 12]]) {
+      const box = [left, top, left + wide, top + 18];
+      if (left < 4 || left + wide > MAP_SIZE - 4 || top < 4 || top + 18 > MAP_SIZE - 50 || !clearOf(box)) continue;
+      taken.push(box, [x - 11, y - 11, x + 11, y + 11]);
+      g.textAlign = 'left';
+      g.lineWidth = 4;
+      g.strokeStyle = 'rgba(30, 24, 16, .75)';
+      g.strokeText(mark.label, left, top + 14);
+      g.fillStyle = 'rgba(255, 255, 255, .92)';
+      g.fillText(mark.label, left, top + 14);
       break;
     }
   }
@@ -10894,13 +10997,26 @@ async function boot() {
   photos = await readJson('photos/index.json').catch(() => photos);
   catalog = await readJson('courses/index.json');
   for (const row of catalog) row.summit = tidySummit(row.summit, row.name);
-  $('intro-count').textContent = '산림청 GPX 데이터를 기반으로 실제 등산로 구현';
+  $('intro-count').textContent = '블랙야크 100대 명산 - 산림청 GPX 데이터를 기반으로 실제 등산로 구현';
   buildMap();
   buildCreator();
   bindControls();
   last = performance.now();
   requestAnimationFrame(frame);
   showIntro();
+  // 주소 끝에 ?course=b001처럼 적으면 그 코스를 바로 고른다. 지도 목록에 없는 시험 코스도 고를 수 있다
+  const wanted = new URLSearchParams(location.search).get('course');
+  if (wanted && /^[a-z]\d{3}$/.test(wanted)) {
+    let row = courseRow(wanted);
+    if (!row) {
+      const data = await readJson(`courses/${wanted}.json`).catch(() => null);
+      if (data) {
+        row = { id: wanted, name: data.name, summit: tidySummit(data.summit, data.name), top: data.top, base: data.base, length: data.length, gain: data.gain, lat: data.origin[0], lon: data.origin[1] };
+        extraCourses.push(row);
+      }
+    }
+    if (row) pickMountain(row);
+  }
   window.bootStage = '끝';
   connectBook().catch(() => {});
 
