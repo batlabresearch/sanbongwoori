@@ -7885,6 +7885,155 @@ function willowCatBody() {
   addLegs(m, j, .0185, .021, legPaint, { hoof: false, fur });
   return { geometry: toSkinned(m), rig: rigLayout(j) };
 }
+function ketchupCatBody() {
+  const j = {
+    pelvis: [0, .225, -.2], spine: [0, .235, -.02], chest: [0, .225, .15], neck: [0, .25, .2], neck2: [0, .285, .232], head: [0, .318, .262], ear: [.048, .4, .262], tail: [0, .285, -.295], tail2: [0, .46, -.4],
+    front: { u: [.056, .2, .155], l: [.056, .105, .165], f: [.056, .024, .165], toe: .205 }, hind: { u: [.062, .22, -.2], l: [.062, .115, -.272], f: [.062, .024, -.222], toe: -.17 },
+  };
+  const m = newSolid(), fur = .055;
+  const coat = (color, x, y, z, s, c) => {
+    color.set('#ec9a45');
+    // 치즈 무늬: 등줄기에서 옆구리로 내려오는 진한 주황 줄
+    if (s > -.3 && Math.sin(z * 36 + Math.abs(c) * 2.6 + noise2(z * 9, y * 9) * 1.2) > .32) shade(color, '#bf5a1c', .72);
+    shade(color, '#a84c16', smooth(.86, .98, s) * .85);
+    shade(color, '#fdf2df', smooth(-.35, -.8, s));
+    speckle(color, x, y, z, .07, 110);
+  };
+  skin(m, trunkRows([[-.31, .285, .225, .012], [-.285, .315, .165, .064], [-.22, .33, .13, .094], [-.11, .322, .118, .102], [0, .308, .126, .092], [.1, .303, .132, .083], [.17, .308, .15, .076], [.22, .303, .192, .056], [.25, .288, .232, .02]], j), [BONE.pelvis, BONE.spine, BONE.chest], coat, { sides: 20, steps: 3, fur });
+  skin(m, [[0, .252, .188, .062, .076, 0], [0, .288, .224, .056, .066, .6], [0, .318, .25, .053, .058, 1.3], [0, .338, .272, .05, .052, 2]], [BONE.neck, BONE.neck2, BONE.head], coat, { sides: 13, steps: 3, fur });
+  const face = (color, x, y, z, s) => {
+    color.set('#efa04c');
+    // 이마의 M자 무늬와 볼 줄
+    if (s > .2 && z < .335 && Math.sin(x * 120) > .2) shade(color, '#bd5a1e', .8);
+    if (Math.abs(s) < .5 && z < .32 && Math.sin((y - .34) * 170) > .55) shade(color, '#c4652a', .55);
+    shade(color, '#fdf4e6', smooth(.335, .362, z) * smooth(.018, .04, Math.abs(x) + (.34 - y) * .9));
+    shade(color, '#fdf4e6', smooth(-.1, -.55, s));
+    speckle(color, x, y, z, .05, 130);
+  };
+  skin(m, [[0, .348, .226, .006, .006], [0, .352, .24, .056, .055], [0, .354, .268, .076, .067], [0, .35, .3, .074, .061], [0, .34, .33, .056, .047], [0, .328, .35, .037, .031], [0, .322, .362, .026, .022], [0, .32, .37, .013, .011], [0, .32, .374, .001, .001]], [BONE.head], face, { sides: 17, steps: 3, fur: .03 });
+  for (const side of [1, -1]) dab(m, side * .02, .317, .358, .017, .0125, .013, BONE.head, '#fdf4e6');
+  dab(m, 0, .329, .372, .0078, .0056, .0042, BONE.head, '#e8918c');
+  for (const side of [1, -1]) {
+    dab(m, side * .043, .36, .337, .0165, .0135, .0085, BONE.head, '#e9b236');
+    dab(m, side * .043, .36, .345, .0042, .0112, .0028, BONE.head, '#0d0a08');
+    dab(m, side * .047, .365, .346, .0018, .0018, .0012, BONE.head, '#f4f6ee', 5);
+    dab(m, side * .043, .373, .334, .0195, .0036, .0095, BONE.head, '#b35a1f');
+    for (const [dy, dz] of [[.014, .022], [.001, .03], [-.012, .02]]) {
+      skin(m, [[side * .026, .322, .358, .0016, .0016], [side * .078, .322 + dy, .356 + dz * .4, .001, .001], [side * .135, .322 + dy * 2.2, .348 + dz, .0003, .0003]], [BONE.head], color => color.set('#f6f3e8'), { sides: 3, steps: 2, fur: 1 });
+    }
+  }
+  const ear = (color, x, y, z, s) => { color.set('#d9812f'); shade(color, '#f2bcae', smooth(.15, -.25, s) * smooth(.47, .41, y)); };
+  addEars(m, [[.042, .392, .265, .01, .01], [.046, .402, .264, .036, .015], [.053, .426, .262, .024, .011], [.058, .448, .26, .01, .0055], [.06, .46, .259, .0006, .0006]], ear, .03);
+  // 꼬리: 줄무늬가 고리처럼 감긴 주황 털꼬리가 위로 휘어 오른다
+  const ring = (color, x, y, z) => { color.set('#ec9a45'); if (Math.sin((y - z) * 58) > .25) shade(color, '#b9561b', .78); shade(color, '#fdf2df', smooth(.55, .6, y) * .7); speckle(color, x, y, z, .05, 110); };
+  skin(m, [[0, .285, -.295, .026, .026, 0], [0, .3, -.355, .024, .024, .3], [0, .34, -.415, .022, .022, .6], [0, .4, -.455, .02, .02, .9], [0, .47, -.475, .018, .018, 1.2], [0, .53, -.47, .016, .016, 1.5], [0, .572, -.455, .012, .012, 1.8], [0, .59, -.445, .004, .004, 2]], [BONE.tail, BONE.tail2, BONE.tail2], ring, { sides: 12, steps: 3, fur });
+  const legPaint = (color, x, y, z) => { color.set('#ec9a45'); if (Math.sin(y * 78) > .45 && y > .075) shade(color, '#bf5a1c', .72); shade(color, '#fdf4e6', smooth(.062, .03, y)); };
+  addLegs(m, j, .0185, .021, legPaint, { hoof: false, fur });
+  // 머리 위 토마토: 두 귀 사이에 얹혀 있다. 아래는 짙고 위는 볕을 받아 밝으며, 세로 골이 살짝 진다
+  const tx = 0, ty = .448, tz = .27, tr = .036;
+  const fruit = (color, x, y, z) => {
+    color.set('#e3392b');
+    shade(color, '#a31f17', smooth(ty, ty - tr, y) * .75);
+    if (Math.sin(Math.atan2(x - tx, z - tz) * 5) > .82) shade(color, '#c42a1e', .45);
+    shade(color, '#ff9a86', smooth(.6, 1, ((y - ty) / tr) * .7 + ((z - tz) / tr) * .3) * .6);
+  };
+  const rows = [];
+  for (let i = 0; i <= 8; i++) {
+    const a = i / 8 * Math.PI, r = Math.max(Math.sin(a), .02);
+    rows.push([tx, ty, tz - Math.cos(a) * tr, tr * r * 1.04, tr * r * .82]);
+  }
+  skin(m, rows, [BONE.head], fruit, { sides: 16, steps: 1, fur: 1 });
+  // 꼭지: 별 모양 초록 받침 다섯 장과 짧은 줄기
+  const top = ty + tr * .8, leafPaint = color => color.set('#4f8f2f');
+  for (let i = 0; i < 5; i++) {
+    const a = i * 1.2566 + .3, dx = Math.sin(a), dz = Math.cos(a);
+    skin(m, [[tx, top, tz, .005, .0022], [tx + dx * .013, top + .001, tz + dz * .013, .0085, .0024], [tx + dx * .026, top - .004, tz + dz * .026, .0008, .0008]], [BONE.head], leafPaint, { sides: 6, steps: 1, fur: 1 });
+  }
+  skin(m, [[tx, top - .002, tz, .0035, .0035], [tx, top + .008, tz + .002, .003, .003], [tx, top + .013, tz + .006, .0022, .0022]], [BONE.head], color => color.set('#3c6d22'), { sides: 6, steps: 1, fur: 1 });
+  return { geometry: toSkinned(m), rig: rigLayout(j) };
+}
+function hedgehogBody() {
+  // 애완 고슴도치(피그미 고슴도치)처럼: 동글동글한 몸, 흰 바탕에 갈색 띠가 있는 가시, 크림색 얼굴, 크고 까만 눈, 짧은 주둥이, 분홍빛 귀와 발
+  const j = {
+    pelvis: [0, .075, -.07], spine: [0, .088, 0], chest: [0, .085, .055], neck: [0, .083, .085], neck2: [0, .08, .1], head: [0, .077, .114], ear: [.022, .104, .109], tail: [0, .062, -.105], tail2: [0, .058, -.115],
+    front: { u: [.033, .042, .066], l: [.033, .021, .07], f: [.033, .004, .072], toe: .083 }, hind: { u: [.037, .044, -.058], l: [.037, .022, -.066], f: [.037, .004, -.062], toe: -.045 },
+  };
+  const m = newSolid(), fur = .035;
+  const back = [[-.112, .07, .045, .01], [-.102, .1, .026, .05], [-.077, .132, .017, .075], [-.037, .15, .014, .086], [.008, .152, .015, .087], [.046, .14, .02, .079], [.07, .12, .032, .063], [.086, .1, .045, .045], [.094, .088, .056, .028]];
+  const coat = (color, x, y, z, s) => {
+    color.set('#b8a487');
+    shade(color, '#8c7559', smooth(.2, .9, s) * .45);
+    shade(color, '#f6eee2', smooth(-.25, -.7, s));
+    speckle(color, x, y, z, .25, 300);
+  };
+  skin(m, trunkRows(back, j), [BONE.pelvis, BONE.spine, BONE.chest], coat, { sides: 18, steps: 3, fur });
+  const at = z => { for (let i = 1; i < back.length; i++) if (back[i][0] >= z) { const a = back[i - 1], b = back[i], t = (z - a[0]) / (b[0] - a[0]); return [lerp(a[1], b[1], t), lerp(a[2], b[2], t), lerp(a[3], b[3], t)]; } return back[back.length - 1].slice(1); };
+  const weight = z => z < j.spine[2] ? clamp((z - j.pelvis[2]) / (j.spine[2] - j.pelvis[2]), 0, 1) : 1 + clamp((z - j.spine[2]) / (j.chest[2] - j.spine[2]), 0, 1);
+  const bones = [BONE.pelvis, BONE.spine, BONE.chest];
+  // 가시: 몸 겉면을 따라 뒤로 눕는다. 밑동과 끝은 희고 가운데에 갈색 띠가 있어 멀리서 보면 밝은 베이지빛이다
+  for (let zi = 0; zi < 24; zi++) {
+    const z = lerp(-.1, .088, zi / 23), [top, belly, w] = at(z), mid = (top + belly) / 2, h = (top - belly) / 2, b = weight(z);
+    const reach = lerp(1.2, 1.68, smooth(-.1, -.055, z) * smooth(.09, .045, z));
+    for (let pi = 0; pi < 13; pi++) {
+      const phi = lerp(-reach, reach, pi / 12) + (hash3(zi, pi, 7) - .5) * .2, nx = Math.sin(phi), ny = Math.cos(phi);
+      const bx = nx * w * .96, by = mid + ny * h * .96, len = .022 + hash3(zi, pi, 9) * .009;
+      const surf = zz => { const [t2, b2, w2] = at(zz); return [nx * w2 * .96, (t2 + b2) / 2 + ny * (t2 - b2) / 2 * .96]; };
+      const [x1, y1] = surf(z - .004), [x2, y2] = surf(z + .004), gx = (x2 - x1) / .008, gy = (y2 - y1) / .008;
+      const tl = Math.hypot(gx, gy, 1), tx = -gx / tl, ty = -gy / tl, tz = -1 / tl;
+      let qx = nx, qy = ny, qz = -(nx * gx + ny * gy);
+      const ql = Math.hypot(qx, qy, qz); qx /= ql; qy /= ql; qz /= ql;
+      const dx = qx * .5 + tx * .87, dy = qy * .5 + ty * .87 + .04, dz = qz * .5 + tz * .87, dl = Math.hypot(dx, dy, dz);
+      const dark = hash3(zi, pi, 13) > .72, bandTone = dark ? '#5e4431' : '#9a7a58';
+      const rows = [0, .38, .7, 1].map((f, i) => [bx + dx / dl * len * f, by + dy / dl * len * f, z + dz / dl * len * f, [.003, .0025, .0017, .0002][i], [.003, .0025, .0017, .0002][i], b]);
+      skin(m, rows, bones, (color, x, y, zz) => {
+        const f = clamp(Math.hypot(x - bx, y - by, zz - z) / len, 0, 1);
+        color.set(f < .2 ? '#f1e8da' : f < .85 ? bandTone : '#fbf7f0');
+      }, { sides: 4, steps: 1, fur: 1 });
+    }
+  }
+  // 등에 비스듬히 꽂힌 큰 오이 하나: 오돌토돌한 돌기와 옅은 세로 줄, 한쪽 끝에 꼭지, 다른 끝에 마른 노란 꽃
+  const cuke = (color, x, y, z, s, c) => {
+    color.set('#3a7a2a');
+    if (Math.sin(Math.atan2(s, c) * 7) > .45) shade(color, '#6aa645', .45);
+    shade(color, '#22501a', smooth(.2, -.9, s) * .45);
+    shade(color, '#8cc25c', smooth(.5, 1, s) * .3);
+    if (hash3(Math.round(x * 1100), Math.round(y * 1100), Math.round(z * 1100)) > .9) shade(color, '#e6f0c8', .85);
+  };
+  {
+    const cz = -.02, cx = .004, turn = .38, tilt = .2, [top] = at(cz), y = top + .005;
+    const k0 = Math.hypot(1, tilt), dx = Math.sin(turn) / k0, dy = tilt / k0, dz = Math.cos(turn) / k0, L = .066, r = .0175;
+    const rows = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10, u = (t - .5) * 2 * L, k = t < .1 ? lerp(.42, 1, smooth(0, .1, t)) : t > .88 ? lerp(1, .55, smooth(.88, 1, t)) : 1 + Math.sin(t * 9.4) * .03;
+      const zz = cz + dz * u;
+      rows.push([cx + dx * u, y + dy * u, zz, r * k, r * k * .96, weight(zz)]);
+    }
+    const e = L * 1.02;
+    rows.push([cx + dx * e, y + dy * e, cz + dz * e, r * .12, r * .12, weight(cz + dz * e)]);
+    skin(m, rows, bones, cuke, { sides: 14, steps: 2, fur: 1 });
+    const back0 = [cx - dx * e, y - dy * e, cz - dz * e];
+    skin(m, [[...back0, .0028, .0028, weight(back0[2])], [back0[0] - dx * .01, back0[1] - dy * .01 + .003, back0[2] - dz * .01, .002, .002, weight(back0[2])]], bones, color => color.set('#7d6b2c'), { sides: 5, steps: 1, fur: 1 });
+    dab(m, cx + dx * (e + .002), y + dy * (e + .002), cz + dz * (e + .002), .004, .004, .004, BONE.chest, '#e3c94a', 6);
+  }
+  // 머리: 짧고 동그란 주둥이, 크림색 털, 볼은 살짝 분홍빛
+  const face = (color, x, y, z, s) => {
+    color.set('#f2e6d4');
+    shade(color, '#d8c3a6', smooth(.3, .95, s) * .35);
+    shade(color, '#fbf6ee', smooth(-.15, -.7, s) * .8);
+    shade(color, '#f0b9ad', smooth(.016, .004, Math.hypot(Math.abs(x) - .02, y - .073, z - .124)) * .55);
+    speckle(color, x, y, z, .05, 180);
+  };
+  skin(m, [[0, .083, .083, .036, .034], [0, .08, .101, .033, .03], [0, .076, .118, .027, .024], [0, .071, .132, .019, .017], [0, .067, .143, .011, .01], [0, .065, .15, .006, .006], [0, .064, .154, .0018, .0018]], [BONE.head], face, { sides: 14, steps: 3, fur: .03 });
+  dab(m, 0, .065, .152, .006, .0052, .005, BONE.head, '#2b1b17');
+  dab(m, .0022, .0672, .1555, .0013, .0011, .0008, BONE.head, '#8a7470', 5);
+  eyes(m, .021, .087, .116, .0072, BONE.head);
+  const ear = (color, x, y, z, s) => { color.set('#f3dccd'); shade(color, '#e7a99b', smooth(.1, -.4, s)); };
+  addEars(m, [[.02, .1, .11, .0065, .0065], [.023, .107, .109, .0095, .0085], [.025, .113, .108, .0065, .005], [.026, .116, .107, .001, .001]], ear, .02);
+  skin(m, [[0, .064, -.103, .005, .005, 0], [0, .06, -.112, .0035, .0035, 1]], [BONE.tail, BONE.tail2], coat, { sides: 6, steps: 1, fur });
+  const legPaint = (color, x, y, z) => { color.set('#efd9c8'); shade(color, '#e6ad9e', smooth(.016, .004, y)); };
+  addLegs(m, j, .0065, .0078, legPaint, { hoof: false, fur });
+  return { geometry: toSkinned(m), rig: rigLayout(j) };
+}
 function horseBody({ horn, wings, mane, hoof, beard }) {
   const j = {
     pelvis: [0, 1.26, -.6], spine: [0, 1.22, -.05], chest: [0, 1.2, .46], neck: [0, 1.38, .72], neck2: [0, 1.64, .87], head: [0, 1.96, 1.02], ear: [.06, 2.05, .99], tail: [0, 1.44, -.95], tail2: [0, 1.14, -1.14],
@@ -7986,6 +8135,8 @@ function addWing(m, side, { root, mid, tip }, bone) {
 const MYTHS = [
   { id: 'flowerChipmunk', name: '꽃다람쥐', myth: true, odds: 1, hops: true, walk: 1.6, run: 4, stride: .3, strideRun: .62, swing: .5, swingRun: .85, knee: 1.2, flex: .32, leap: .03, bob: 0, wag: .25, tailLift: .25, shy: 3, nibble: .5, length: .22, scale: 1.9, climbs: true, rears: true, lore: '머리에 작은 꽃을 피우는 다람쥐입니다. 도토리를 숨긴 자리마다 씨앗을 떨어뜨려, 이 다람쥐가 지나간 길에는 이듬해 꽃이 핀다고 전해집니다.', hint: '꽃이 많은 등산로 곁에서 나무를 타고 오르내린다고 합니다.', make: () => squirrelBody({ back: '#c49458', flank: '#e0b780', belly: '#f7eee0', tail: '#b9875a', edge: '#f3dfc4', stripes: true, bloom: true }) },
   { id: 'willowCat', name: '버들고양이', myth: true, odds: 1, walk: .7, run: 4.5, stride: .55, strideRun: 1.1, swing: .36, swingRun: .62, knee: 1, flex: .16, leap: .05, bob: .006, wag: .22, tailLift: 0, shy: 6, nibble: .3, length: .5, scale: 1.15, sit: .13, lore: '꼬리가 버들잎 모양인 고양이입니다. 바람이 불면 꼬리가 잎처럼 흔들려서, 물가 버드나무 사이에 앉아 있으면 좀처럼 찾기 어렵습니다.', hint: '조용히 걷다 보면 길가에서 초록 잎이 움직이는 것을 볼 수 있습니다.', make: willowCatBody },
+  { id: 'cucumberHedgehog', name: '오이고슴도치', myth: true, odds: 1, walk: .5, run: 1.8, stride: .13, strideRun: .26, swing: .3, swingRun: .55, knee: .9, flex: .1, leap: .01, bob: .004, wag: .02, tailLift: 0, shy: 4, nibble: .5, length: .26, scale: 1.6, lore: '등 가시에 커다란 오이 하나를 꽂고 다니는 작은 고슴도치입니다. 밭에서 떨어진 오이를 주워 가시에 꽂아 두었다가, 목이 마를 때마다 조금씩 아삭아삭 베어 먹는다고 합니다.', hint: '해 질 무렵 풀숲에서 오이 냄새가 나면 가까이에 있다는 이야기가 있습니다.', make: hedgehogBody },
+  { id: 'ketchupCat', name: '케찹고양이', myth: true, odds: 1, walk: .7, run: 4.5, stride: .55, strideRun: 1.1, swing: .36, swingRun: .62, knee: 1, flex: .16, leap: .05, bob: .006, wag: .22, tailLift: .35, shy: 6, nibble: .3, length: .5, scale: 1.15, sit: .13, lore: '머리 위에 빨간 토마토를 얹고 다니는 주황색 치즈 고양이입니다. 토마토가 떨어질까 봐 늘 고개를 꼿꼿이 들고 걸어서, 다른 고양이보다 걸음이 조금 느립니다.', hint: '볕이 잘 드는 길가 바위에서 토마토를 말리며 졸고 있었다는 이야기가 있습니다.', make: ketchupCatBody },
   { id: 'unicorn', name: '유니콘', myth: true, big: true, odds: 1, walk: .9, run: 8.5, stride: 1.6, strideRun: 3.8, swing: .3, swingRun: .62, knee: 1.1, flex: .14, leap: .16, bob: .014, wag: .08, swish: .7, toss: .22, tailLift: -.6, shy: 20, nibble: 1.15, length: 1.75, lore: '이마에 나선 뿔이 난 흰 말입니다. 먼 등산로 끝에 가만히 서 있다가, 사람이 다가오면 소리 없이 숲으로 사라집니다.', hint: '등산로 저 멀리, 시야가 트인 곳에 서 있었다는 이야기가 있습니다.', make: () => horseBody({ horn: true, beard: true, mane: ['#c8b2ee', '#f3c3dd'], hoof: '#cfa64e' }) },
   { id: 'pegasus', name: '페가수스', myth: true, flies: true, odds: 1, walk: 1, run: 1, stride: 1, strideRun: 1, swing: 0, swingRun: 0, knee: 0, flex: 0, leap: 0, bob: 0, wag: .2, tailLift: 0, shy: 0, nibble: 0, length: 1.75, scale: 1.2, lore: '날개 달린 흰 말입니다. 숲 위로는 내려오지 않고, 하늘이 트인 능선이나 정상 위를 크게 돌며 날아갑니다.', hint: '하늘이 트인 곳에서 고개를 들어 보세요. 정상이라면 더 좋습니다.', make: () => horseBody({ wings: true, mane: ['#b8d6f2', '#f6f3ec'], hoof: '#e3c779' }) },
 ];
