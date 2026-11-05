@@ -7089,13 +7089,13 @@ class Hiker {
   }
 }
 
-// 같이 오르는 등산객: 리센느 다섯 멤버. 상표는 넣지 않고 색과 차림만 맞췄다
+// 같이 오르는 등산객 다섯 명(처음 모습)
 const NPC_LOOKS = [
-  { name: '원이', style: 'woni', stamina0: 96, lane: -.9, start: 2.4, gender: 'female', sleeve: 'long', legs: 'long', top: '#141414', bottom: '#141414', hat: '#141414', bag: '#222222', shoe: '#f4f4f4', hair: '#0f0b09', skin: '#f3d2ba', lip: '#d06a78' },
-  { name: '리브', stamina0: 80, lane: .6, start: 1.6, gender: 'female', sleeve: 'long', legs: 'long', top: '#9fb7e6', bottom: '#2c3345', hat: '#f2efe8', bag: '#e6d6c2', shoe: '#f4efe4', hair: '#7a5236' },
-  { name: '미나미', style: 'minami', stamina0: 62, lane: -.4, start: .8, gender: 'female', sleeve: 'short', legs: 'short', top: '#62cdb9', bottom: '#f2a6c2', hat: '#f4b4c8', bag: '#f3b8d4', shoe: '#f7f5f2', sole: '#f7f5f2', sock: '#f7c4d3', hair: '#a8724a', skin: '#f4d4bc', lip: '#e0708f', accent: '#ff7fb0' },
-  { name: '메이', stamina0: 45, lane: .95, start: 3.2, gender: 'female', sleeve: 'long', legs: 'long', top: '#c9e8d6', bottom: '#3b3b44', hat: '#2f3b52', bag: '#d9895a', shoe: '#2b2c2e', hair: '#1d1612' },
-  { name: '제나', stamina0: 30, lane: .2, start: 4, gender: 'female', sleeve: 'short', legs: 'long', top: '#f1e3c8', bottom: '#5a4636', hat: '#a8452f', bag: '#3b6b4a', shoe: '#7a5a3c', hair: '#5b2f24' },
+  { name: '산들', stamina0: 96, lane: -.9, start: 2.4, gender: 'male', sleeve: 'short', legs: 'long', top: '#d9593d', bottom: '#39424e', hat: '#e7d9b4', bag: '#32506b', shoe: '#2f3b46' },
+  { name: '다람', stamina0: 80, lane: .6, start: 1.6, gender: 'female', sleeve: 'long', legs: 'long', top: '#3b8ea5', bottom: '#4b4034', hat: '#f1c44b', bag: '#a8452f', shoe: '#f4efe4' },
+  { name: '솔이', stamina0: 62, lane: -.4, start: .8, gender: 'female', sleeve: 'short', legs: 'short', top: '#8a6fc9', bottom: '#2f3a33', hat: '#ffffff', bag: '#3b6b4a', shoe: '#e08bb0' },
+  { name: '바우', stamina0: 45, lane: .95, start: 3.2, gender: 'male', sleeve: 'long', legs: 'short', top: '#5d9c5a', bottom: '#3a3a45', hat: '#b5573b', bag: '#c5923a', shoe: '#7a5a3c' },
+  { name: '여울', stamina0: 30, lane: .2, start: 4, gender: 'female', sleeve: 'long', legs: 'long', top: '#e08bb0', bottom: '#40485a', hat: '#6b8fbf', bag: '#6c4f35', shoe: '#2b2c2e' },
 ];
 let player, npcs = [], everyone = [];
 const tags = new Map();
