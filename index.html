@@ -8699,6 +8699,23 @@ class Sound {
       for (let j = 0; j < len && at + j < d.length; j++) d[at + j] += (Math.random() * 2 - 1) * level * (1 - j / len);
     }
   }
+  // 짧은 시간 안에 알갱이를 몰아 넣어 바스러지는 소리 한 덩이를 만든다
+  burst(d, sr, { start, length, count, amp, shortest, longest }) {
+    for (let g = 0; g < count; g++) {
+      const f = Math.random(), at = Math.floor((start + f * length) * sr), len = Math.floor(sr * (shortest + Math.random() * longest));
+      const level = amp * Math.sin(Math.PI * f) ** .5 * (.35 + Math.random() * .65);
+      for (let j = 0; j < len && at + j < d.length; j++) d[at + j] += (Math.random() * 2 - 1) * level * (1 - j / len);
+    }
+  }
+  // 낮게 뭉개진 바람 소리 같은 눌림 소리
+  puff(d, sr, { start, length, amp, smoothing }) {
+    let last = 0;
+    const from = Math.floor(start * sr), n = Math.floor(length * sr);
+    for (let i = 0; i < n && from + i < d.length; i++) {
+      last = last * smoothing + (Math.random() * 2 - 1) * (1 - smoothing);
+      d[from + i] += last * amp * 4 * Math.exp(-i / n * 4) * Math.min(1, i / (sr * .004));
+    }
+  }
   thump(d, sr, freq, decay, amp) {
     for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] += Math.sin(6.283 * freq * t) * Math.exp(-t * decay) * amp; }
   }
@@ -8713,6 +8730,13 @@ class Sound {
       grass: d => { this.thump(d, sr, 70, 42, .26); this.grains(d, sr, { count: 150, spread: 1, amp: .1, shortest: .004, longest: .012 }); },
       // 눈: 낮게 눌리는 소리 위로 잘게 부서지는 뽀드득 소리가 길게 이어진다
       snow: d => { this.thump(d, sr, 58, 26, .2); this.grains(d, sr, { count: 520, spread: .9, amp: .3, shortest: .0005, longest: .0018 }); this.grains(d, sr, { count: 70, spread: .55, amp: .42, shortest: .002, longest: .006 }); },
+      // 뽀드득: 발에 눌리는 둔한 '뽀' 뒤로 마른 눈이 촘촘히 바스러지는 '드득'이 두 번 짧게 이어진다. 음높이가 있는 소리는 넣지 않는다
+      crunch: d => {
+        this.thump(d, sr, 72 + Math.random() * 14, 40, .24);
+        this.puff(d, sr, { start: 0, length: .055, amp: .41, smoothing: .86 });
+        this.burst(d, sr, { start: .03 + Math.random() * .012, length: .045, count: 280, amp: .43, shortest: .0003, longest: .0009 });
+        this.burst(d, sr, { start: .1 + Math.random() * .02, length: .065, count: 340, amp: .36, shortest: .0003, longest: .0011 });
+      },
     };
     for (const [name, build] of Object.entries(recipe)) {
       this.steps[name] = [0, 1, 2, 3].map(() => {
@@ -8725,13 +8749,15 @@ class Sound {
   audible() { return this.ctx?.state === 'running' && this.volume > 0 && !document.hidden; }
   step(kind = 'dirt', loud = 1) {
     if (!this.audible()) return;
-    const { ctx } = this, set = this.steps[kind];
+    // 눈길에서는 두 걸음에 한 번쯤 뽀드득 소리가 섞인다
+    const voice = kind === 'snow' && Math.random() < .45 ? 'crunch' : kind;
+    const { ctx } = this, set = this.steps[voice];
     const source = ctx.createBufferSource();
     source.buffer = set[Math.floor(Math.random() * set.length)];
     source.playbackRate.value = .88 + Math.random() * .26;
     const low = ctx.createBiquadFilter();
     low.type = 'lowpass';
-    low.frequency.value = { dirt: 2200, gravel: 5200, stone: 4200, wood: 2600, leaves: 5600, grass: 3600, snow: 4600 }[kind];
+    low.frequency.value = { dirt: 2200, gravel: 5200, stone: 4200, wood: 2600, leaves: 5600, grass: 3600, snow: 4600, crunch: 3800 }[voice];
     const high = ctx.createBiquadFilter();
     high.type = 'highpass'; high.frequency.value = 90;
     const gain = ctx.createGain();
