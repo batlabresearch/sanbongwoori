@@ -132,7 +132,18 @@ body.panorama #hud, body.panorama #tags, body.panorama #flower-tag, body.panoram
 .promo-go { font-family: var(--display); font-size: 18px; font-weight: 800; }
 .promo-close { position: absolute; top: 8px; right: 8px; z-index: 1; width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: rgba(20, 15, 9, .78); color: var(--carve); font-size: 20px; line-height: 1; cursor: pointer; }
 .promo-close:focus-visible, .promo-go:focus-visible { outline: 2px solid var(--carve); outline-offset: 2px; }
-.intro-main { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto auto; gap: 10px; }
+.intro-main { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto auto auto; gap: 10px; }
+.season-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.season-label { font-family: var(--display); font-weight: 800; font-size: 15px; }
+.season-picks { display: flex; gap: 6px; }
+.season-pick { min-width: 58px; min-height: 40px; padding: 3px 12px; display: grid; justify-items: center; align-content: center; line-height: 1.15; border: 1px solid var(--line); border-radius: 4px; background: var(--shade); color: var(--carve); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.season-pick small { font-size: 11px; font-weight: 500; color: var(--carve-dim); }
+.season-pick[aria-checked="true"] { border-color: var(--ribbon); background: var(--ribbon); color: var(--bark); }
+.season-pick[aria-checked="true"] small { color: rgba(42, 32, 21, .75); }
+.season-pick:disabled { opacity: .42; cursor: default; }
+.season-pick:not(:disabled):not([aria-checked="true"]):hover { border-color: var(--ribbon); }
+.season-pick:focus-visible { outline: 2px solid var(--carve); outline-offset: 2px; }
+.season-note { margin: 0; flex: 1 1 220px; font-size: 12.5px; color: var(--carve-dim); }
 .brand { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; text-shadow: 0 1px 3px rgba(20, 15, 9, .8), 0 2px 16px rgba(20, 15, 9, .7); }
 h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(38px, 5.4vw, 60px); line-height: 1.05; letter-spacing: -.02em; animation: rise .8s ease-out backwards; }
 h1 small { margin-left: 9px; font-family: var(--ui); font-weight: 500; font-size: 17px; letter-spacing: 0; color: var(--ribbon); }
@@ -627,6 +638,11 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
         <svg id="korea" role="group" aria-label="우리나라 지도에서 지역과 산 고르기" preserveAspectRatio="xMidYMid meet"></svg>
         <div class="peak-list" id="peak-list" aria-label="이 지역의 산"></div>
       </div>
+    </div>
+    <div class="season-row" id="season-row">
+      <span class="season-label" id="season-label">계절</span>
+      <div class="season-picks" id="season-picks" role="radiogroup" aria-labelledby="season-label"></div>
+      <p class="season-note" id="season-note" aria-live="polite"></p>
     </div>
     <div class="go-row" id="go-row">
       <button class="peak-card" id="start" type="button" disabled aria-live="polite">
@@ -1903,7 +1919,7 @@ function buildBackdrop() {
   }
   geo.computeVertexNormals();
   geo.setAttribute('aTown', new THREE.BufferAttribute(town, 1));
-  const green = new THREE.Color('#4f7346'), blue = new THREE.Color('#6d8ea3'), haze = new THREE.Color('#a9c1cb'), pave = new THREE.Color('#6e7478'), road = new THREE.Color(), mix = new THREE.Color();
+  const green = new THREE.Color({ spring: '#5d8a48', summer: '#456d3c', autumn: '#7a6838', winter: '#4f7346' }[course.season ?? 'autumn']), blue = new THREE.Color('#6d8ea3'), haze = new THREE.Color('#a9c1cb'), pave = new THREE.Color('#6e7478'), road = new THREE.Color(), mix = new THREE.Color();
   const mat = new THREE.MeshLambertMaterial({ color: '#ffffff' });
   mat.onBeforeCompile = shader => {
     shader.uniforms.uHole = hole;
@@ -1914,17 +1930,28 @@ function buildBackdrop() {
     shader.uniforms.uForest = { value: textures.forest };
     shader.uniforms.uMottle = { value: textures.mottle };
     shader.uniforms.uFloor = { value: floor };
+    shader.uniforms.uSeason = { value: new THREE.Vector3(course.season === 'autumn' ? 1 : 0, course.season === 'spring' ? 1 : 0, course.season === 'summer' ? 1 : 0) };
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aTown;\nvarying float vTown;\nvarying vec3 vWP;\nvarying vec3 vWN;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = position;\nvWN = normal;\nvTown = aTown;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vTown;\nuniform vec4 uRect;\nuniform vec2 uMid;\nuniform vec3 uTones[4];\nuniform vec3 uHole;\nuniform sampler2D uForest;\nuniform sampler2D uMottle;\nuniform float uFloor;\nuniform float uSnowLine;\nvarying vec3 vWP;\nvarying vec3 vWN;')
+      .replace('#include <common>', '#include <common>\nvarying float vTown;\nuniform vec4 uRect;\nuniform vec2 uMid;\nuniform vec3 uTones[4];\nuniform vec3 uHole;\nuniform sampler2D uForest;\nuniform sampler2D uMottle;\nuniform float uFloor;\nuniform float uSnowLine;\nuniform vec3 uSeason;\nvarying vec3 vWP;\nvarying vec3 vWN;')
       .replace('#include <map_fragment>', `
         if (distance(vWP.xz, uHole.xy) < uHole.z) discard;
         vec3 woods = mix(texture2D(uForest, vWP.xz * .011).rgb, vec3(.09, .15, .07), .45) * (.72 + texture2D(uMottle, vWP.xz * .0021).r * .62);
         // 내려다볼 때 우듬지 하나하나와 숲결이 보이도록 다섯 배 잘게 한 무늬를 겹친다
         vec3 crowns = texture2D(uForest, vWP.xz * .055 + .37).rgb;
         woods *= (.62 + crowns * .9) * (.85 + texture2D(uMottle, vWP.xz * .0105).r * .3);
+        {
+          // 계절: 가을은 노랑·주황 단풍에 갈색이 조금, 봄은 연두에 분홍 벚꽃 무리, 여름은 짙은 초록
+          float lum = dot(woods, vec3(.3, .59, .11)), blotch = texture2D(uMottle, vWP.xz * .0062 + .21).r, speck = texture2D(uMottle, vWP.xz * .031 + .63).r;
+          vec3 fallTone = mix(vec3(.95, .68, .1), vec3(1.0, .4, .07), smoothstep(.35, .62, blotch + (speck - .5) * .5));
+          fallTone = mix(fallTone, vec3(.45, .27, .1), smoothstep(.8, .92, speck));
+          woods = mix(woods, fallTone * lum * 2.6, uSeason.x * smoothstep(.12, .3, speck + blotch * .5));
+          vec3 springTone = mix(woods * vec3(1.12, 1.18, .9), vec3(1.0, .62, .74) * lum * 3.2, smoothstep(.62, .7, speck) * .9);
+          woods = mix(woods, springTone, uSeason.y);
+          woods = mix(woods, woods * vec3(.82, 1.06, .78), uSeason.z);
+        }
         // 낮은 곳은 논밭과 마을이 조각조각 보인다. 밭마다 고랑이 나 있고 밭 사이로 농로가 지난다
         vec2 plot = floor(vWP.xz / 46.0);
         float pick = fract(sin(dot(plot, vec2(12.9898, 78.233))) * 43758.5453);
@@ -2187,8 +2214,8 @@ function tube(out, path, radii, sides, color, base = color, vRepeat = .5) {
 }
 // 잎뭉치 카드를 공 모양으로 모은다. 안쪽과 아래쪽은 어둡게 칠해 입체감을 준다
 function cluster(out, c, radius, count, size, tree, color, rand, flat = 0) {
-  const corner = V(0, 0, 0), n = V(0, 0, 0);
-  for (let i = 0; i < count; i++) {
+  const corner = V(0, 0, 0), n = V(0, 0, 0), total = Math.round(count * leafBoost);
+  for (let i = 0; i < total; i++) {
     const p = c.clone().addScaledVector(randomUnit(rand), radius * Math.cbrt(rand()));
     const face = randomUnit(rand).lerp(UP, flat).normalize();
     const a = V(0, 0, 0).crossVectors(face, Math.abs(face.y) > .9 ? SIDE : UP).normalize();
@@ -2268,7 +2295,7 @@ function conifer({ height, whorls, per, spread, droop, color, barkColor, seed, q
   const rand = mulberry(seed), wood = newMesh(), leaves = newMesh();
   const full = quality >= 1, brown = CC(barkColor), leaf = CC(color);
   tube(wood, [V(0, 0, 0), V(0, height * .08, 0), V(0, height * .5, 0), V(0, height, 0)], [trunkR * 1.25, trunkR, trunkR * .55, .02], full ? 8 : 4, brown, brown.clone().multiplyScalar(.7));
-  const rings = full ? Math.round(whorls * Math.sqrt(meshDetail.cards)) : Math.ceil(whorls / 2), arms = full ? Math.round(per * Math.sqrt(meshDetail.cards)) : Math.max(3, Math.ceil(per * .6));
+  const rings = full ? Math.round(whorls * Math.sqrt(meshDetail.cards)) : Math.ceil(whorls / 2), arms = full ? Math.round(per * Math.sqrt(meshDetail.cards) * leafBoost) : Math.max(3, Math.ceil(per * .6 * leafBoost));
   for (let w = 0; w < rings; w++) {
     const t = w / (rings - 1), y = lerp(height * .16, height - .3, t), len = lerp(spread, spread * .18, t) * (.9 + rand() * .2);
     const half = len * (full ? width : width * 1.7), tone = lerp(.6, 1.16, t);
@@ -2307,6 +2334,122 @@ const TREES = {
   yew: { leaf: 'fir', bark: 'plate', build: q => conifer({ height: 6.5, whorls: 11, per: 7, spread: 2.5, droop: .12, color: '#2f5f3a', barkColor: '#9a5a3f', seed: 53, quality: q, trunkR: .36, width: .44 }) },
   gusang: { leaf: 'fir', bark: 'furrow', build: q => conifer({ height: 7, whorls: 11, per: 6, spread: 2.1, droop: .18, color: '#5c8a7a', barkColor: '#6a6158', seed: 59, quality: q, trunkR: .2, width: .4 }) },
 };
+/* ---------- 계절: 봄·여름·가을·겨울. 오늘 날짜의 계절은 그냥 오르고, 다른 계절은 기운 5를 써서 고른다 ---------- */
+const SEASONS = {
+  spring: { name: '봄', to: '봄으로', months: [3, 4, 5], flowers: 6, bugs: 1.3, birds: 3 },
+  summer: { name: '여름', to: '여름으로', months: [6, 7, 8], flowers: 1, bugs: 2.6, birds: 3 },
+  autumn: { name: '가을', to: '가을로', months: [9, 10, 11], flowers: 1, bugs: 1, birds: 1 },
+  winter: { name: '겨울', to: '겨울로', months: [12, 1, 2], flowers: 1, bugs: 0, birds: 1 },
+};
+const SEASON_COST = 5;
+const seasonNow = (date = new Date()) => Object.keys(SEASONS).find(key => SEASONS[key].months.includes(date.getMonth() + 1));
+// season: 지금 열어 둔 산의 계절. pickedSeason: 첫 화면에서 고른 계절
+let season = seasonNow(), pickedSeason = season;
+const seasonFx = () => SEASONS[course?.season ?? season];
+
+// 나무 잎 색. 잎 그림은 회색이라 꼭짓점 색 × 나무마다의 색으로 칠해진다. 그래서 바탕색에 대한 비율로 원하는 색을 만든다
+const LEAF_BASE = { oak: '#82a84a', hornbeam: '#6f9e4c', chestnut: '#6a9440', cherry: '#8aae52', maple: '#ee7c2e', birch: '#b2cf62', youngOak: '#8bb04e', youngMaple: '#e8892f', youngOval: '#9cc05a' };
+const CONIFERS = new Set(['pine', 'koreanPine', 'fir', 'yew', 'gusang']);
+const LEAF_TONES = {
+  // 벚꽃: 연분홍에서 진분홍까지
+  blossom: ['#fdeaf1', '#fbd9e6', '#f8c4d8', '#f4adc9', '#ef93b8', '#e9799f', '#e0608d'],
+  // 봄 새잎: 밝은 연두
+  fresh: ['#a8cf62', '#9cc85a', '#b5d872', '#8fbf52'],
+  // 여름: 짙고 맑은 초록
+  deep: ['#5f9a3c', '#548f36', '#6aa344', '#4d8632'],
+  // 가을: 노랑과 주황을 여러 가지로, 갈색은 조금
+  yellow: ['#f4cf3a', '#eec02c', '#f7da55', '#e6b324', '#f2c94a', '#dca51c', '#f9e06a'],
+  orange: ['#f0902c', '#ea7a22', '#f4a23e', '#de6a1c', '#f7b04e', '#e88430', '#d95f18'],
+  brown: ['#a8692c', '#94602e', '#b57a3a'],
+};
+const seasonColor = new THREE.Color(), seasonBase = new THREE.Color();
+const pickTone = (list, rand) => list[Math.floor(rand() * list.length) % list.length];
+// 계절에 따라 나무 종류를 바꾼다. 봄에는 나무의 3할이 벚꽃나무, 가을에는 단풍 드는 나무가 7할을 넘게 침엽수 일부를 활엽수로 바꾼다
+function seasonTree(kind, decor, rand) {
+  const now = course?.season ?? season;
+  if (now === 'spring') {
+    if (rand() < .3) return 'cherry';
+    return kind === 'cherry' ? 'oak' : kind;
+  }
+  if (now === 'autumn' && CONIFERS.has(kind)) {
+    const conifer = decor.coniferShare ??= decor.trees.reduce((sum, [name, w]) => sum + (CONIFERS.has(name) ? w : 0), 0) / decor.trees.reduce((sum, [, w]) => sum + w, 0);
+    const swap = conifer > 0 ? clamp((.8 / .93 - (1 - conifer)) / conifer, 0, 1) : 0;
+    if (rand() < swap) { const r = rand(); return r < .32 ? 'oak' : r < .58 ? 'maple' : r < .74 ? 'chestnut' : r < .88 ? 'hornbeam' : 'birch'; }
+  }
+  return kind;
+}
+// 이 나무의 잎에 칠할 색 비율(선형 RGB). 줄기는 그대로 두고 잎에만 쓴다
+function seasonLeaf(kind, tint, rand) {
+  const now = course?.season ?? season, base = LEAF_BASE[kind];
+  if (!base || now === 'winter') return null;
+  let tone = null;
+  if (now === 'spring') tone = kind === 'cherry' ? pickTone(LEAF_TONES.blossom, rand) : pickTone(LEAF_TONES.fresh, rand);
+  else if (now === 'summer') tone = kind === 'maple' || kind === 'youngMaple' ? pickTone(LEAF_TONES.deep, rand) : null;
+  else {
+    const r = rand();
+    if (r < .07) tone = kind === 'maple' || kind === 'youngMaple' ? null : '#a9b84a';
+    else tone = pickTone(r < .52 ? LEAF_TONES.yellow : r < .9 ? LEAF_TONES.orange : LEAF_TONES.brown, rand);
+  }
+  if (!tone) return null;
+  seasonColor.set(tone);
+  seasonBase.set(base);
+  const l = tint[1];
+  return [seasonColor.r / seasonBase.r * l * (1 + (rand() - .5) * .08), seasonColor.g / seasonBase.g * l, seasonColor.b / seasonBase.b * l * (1 + (rand() - .5) * .08)];
+}
+// 여름에는 모든 나무의 잎을 2할 더 단다. 처음 여름 산을 열 때 한 번만 만든다
+let leafBoost = 1, baseKinds = null, lushKinds = null;
+function lushTrees(base) {
+  const out = {};
+  leafBoost = 1.2;
+  try {
+    for (const [name, spec] of Object.entries(TREES)) {
+      const again = (model, ref) => [{ ...ref[0], geo: model.wood }, { ...ref[1], geo: model.leaf }];
+      out[name] = { parts: again(HD ? coarse(() => spec.build(1)) : spec.build(1), base[name].parts), layer: 'high' };
+      if (HD) out[`${name}Hd`] = { parts: again(spec.build(1), base[`${name}Hd`].parts), layer: 'hd' };
+      const low = again(coarse(() => spec.build(.26)), base[`${name}Low`].parts);
+      out[`${name}Low`] = { parts: low, layer: 'low' };
+      out[`${name}Far`] = { parts: low, layer: 'group' };
+    }
+  } finally { leafBoost = 1; }
+  return { ...base, ...out };
+}
+function kindsFor(now) {
+  baseKinds ??= kinds;
+  if (now !== 'summer') return baseKinds;
+  return lushKinds ??= lushTrees(baseKinds);
+}
+
+// 첫 화면의 계절 고르기
+function buildSeasonPicks() {
+  const box = $('season-picks');
+  for (const [key, info] of Object.entries(SEASONS)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'season-pick';
+    b.dataset.season = key;
+    b.setAttribute('role', 'radio');
+    b.append(document.createTextNode(info.name), document.createElement('small'));
+    b.addEventListener('click', () => { pickedSeason = key; renderSeason(); });
+    box.append(b);
+  }
+  renderSeason();
+}
+function renderSeason() {
+  const box = $('season-picks');
+  if (!box?.children.length) return;
+  const now = seasonNow(), energy = record.energy ?? 0, rich = energy >= SEASON_COST;
+  if (pickedSeason !== now && !rich) pickedSeason = now;
+  for (const b of box.children) {
+    const key = b.dataset.season, here = key === now;
+    b.setAttribute('aria-checked', String(key === pickedSeason));
+    b.disabled = !here && !rich;
+    b.querySelector('small').textContent = here ? '지금' : `★${SEASON_COST}`;
+    b.title = here ? '오늘 날짜의 계절입니다' : rich ? `기운 ${SEASON_COST}을 써서 ${SEASONS[key].to} 오릅니다` : `기운 ${SEASON_COST}이 있어야 고를 수 있어요`;
+  }
+  $('season-note').textContent = pickedSeason === now
+    ? `지금은 ${SEASONS[now].name}이에요. 다른 계절은 기운 ★${SEASON_COST}로 고를 수 있어요 (지금 ★${energy})`
+    : `${SEASONS[pickedSeason].to} 오르면 출발할 때 기운 ★${SEASON_COST}를 씁니다 (지금 ★${energy})`;
+}
 const TRUNK = { oak: .42, hornbeam: .3, chestnut: .4, cherry: .28, maple: .3, birch: .2, pine: .36, koreanPine: .32, fir: .32, yew: .38, gusang: .24 };   // 부딪히는 줄기 반지름
 const CANOPY = { oak: .9, hornbeam: .7, chestnut: .9, cherry: .7, maple: .8, birch: .5, pine: .7, koreanPine: 2, fir: 2.1, yew: 1.8, gusang: 1.5 };   // 카메라가 피해야 할 반지름
 
@@ -3253,7 +3396,7 @@ function plantKinds() {
   const out = {};
   for (const [name, spec] of Object.entries(TREES)) {
     // 먼 나무는 그림자 범위 밖이라 그림자 계산에서 뺀다
-    const parts = (model, cast) => [{ geo: model.wood, mat: barks[spec.bark], cast }, { geo: model.leaf, mat: sheets[spec.leaf].mat, depth: cast ? sheets[spec.leaf].depth : null, cast }];
+    const parts = (model, cast) => [{ geo: model.wood, mat: barks[spec.bark], cast }, { geo: model.leaf, mat: sheets[spec.leaf].mat, depth: cast ? sheets[spec.leaf].depth : null, cast, foliage: true }];
     const high = parts(HD ? coarse(() => spec.build(1)) : spec.build(1), true), low = parts(coarse(() => spec.build(.26)), false);
     out[name] = { parts: high, layer: 'high' };
     if (HD) out[`${name}Hd`] = { parts: parts(spec.build(1), true), layer: 'hd' };
@@ -3263,7 +3406,7 @@ function plantKinds() {
   // 어린나무
   const young = (name, leaf, color, bark, seed) => {
     const model = broadleaf({ trunkH: 1, trunkR: .05, limbs: 4, reach: .7, rise: .9, perLimb: 1, clusterR: .44, cards: 5, size: .36, color, barkColor: '#7a6650', seed, quality: 1, roots: 0 });
-    out[name] = { parts: [{ geo: model.wood, mat: barks[bark], cast: true }, { geo: model.leaf, mat: sheets[leaf].mat, depth: sheets[leaf].depth, cast: true }], layer: 'small' };
+    out[name] = { parts: [{ geo: model.wood, mat: barks[bark], cast: true }, { geo: model.leaf, mat: sheets[leaf].mat, depth: sheets[leaf].depth, cast: true, foliage: true }], layer: 'small' };
   };
   young('youngOak', 'oak', '#8bb04e', 'smooth', 101);
   young('youngMaple', 'maple', '#e8892f', 'smooth', 103);
@@ -3480,7 +3623,7 @@ function plantMeshes(tile, spec, list, parent) {
           dummy.updateMatrix();
           mesh.setMatrixAt(i, dummy.matrix);
         }
-        mesh.setColorAt(i, tintColor.setRGB(...item.tint));
+        mesh.setColorAt(i, tintColor.setRGB(...(part.foliage && item.leaf ? item.leaf : item.tint)));
       });
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
@@ -3568,7 +3711,9 @@ function* plantTile(tile) {
   };
   const put = (kind, x, z, { s = 1, sy = 1, y = null, lift = 0, color = null, tilt = 0 } = {}) => {
     if (summitSpot?.clear?.(x, z) || siteBlocked(x, z)) return;
-    (lists[kind] ||= []).push({ x, z, y: y ?? groundHeight(x, z) + lift, s, sy, yaw: rand() * 6.283, tilt: (rand() - .5) * tilt, tint: color ?? shade() });
+    const item = { x, z, y: y ?? groundHeight(x, z) + lift, s, sy, yaw: rand() * 6.283, tilt: (rand() - .5) * tilt, tint: color ?? shade() };
+    if (LEAF_BASE[kind]) item.leaf = seasonLeaf(kind, item.tint, rand);
+    (lists[kind] ||= []).push(item);
     if (kind.startsWith('rock') && s > .55) tile.colliders.push({ x, z, r: s * .85, cam: 0 });
   };
   const samples = tile.samples, meters = samples.length * trail.ds;
@@ -3608,10 +3753,12 @@ function* plantTile(tile) {
       if (rand() > decor.tree) continue;
       let roll = rand(), kind = decor.trees[0][0];
       for (const [name, weight] of decor.trees) { if ((roll -= weight) <= 0) { kind = name; break; } }
+      kind = seasonTree(kind, decor, rand);
       if ((kind === 'fir' || kind === 'koreanPine' || kind === 'yew' || kind === 'gusang') && hit && hit.d < 5.2) kind = 'birch';
       const s = .78 + rand() * .62;
       const ground = hit && hit.d < CARVE_OUT ? groundHeight(x, z) : rough;
       const item = { x, z, y: ground - .08, s, sy: 1, yaw: rand() * 6.283, tilt: (rand() - .5) * .05, tint: shade(.14) };
+      item.leaf = seasonLeaf(kind, item.tint, rand);
       if (!hit) { (lists[`${kind}Far`] ||= []).push(item); continue; }
       (lists[kind] ||= []).push(item);
       (lists[`${kind}Low`] ||= []).push(item);
@@ -3672,7 +3819,8 @@ function* plantTile(tile) {
       }
     }
     // 꽃: 고도에 맞는 종이 길가에 무리 지어 핀다
-    for (let a = attempts('flower'); a > 0; a--) {
+    // 봄에는 꽃이 여섯 배로 핀다
+    for (let a = Math.round(attempts('flower') * seasonFx().flowers); a > 0; a--) {
       const { index, x, z } = roadside(1.8, 5.2, 1);
       if (rand() > decorAt(index).flower / PEAK.flower) continue;
       const altitude = trail.ys[index];
@@ -9010,11 +9158,423 @@ function flyerSide() {
   if (!best) return undefined;
   return clamp(((best.x - player.x) * Math.cos(cam.yaw) - (best.z - player.z) * Math.sin(cam.yaw)) / Math.max(closest, 1), -.85, .85);
 }
+/* ---------- 날아다니는 새: 등산로 위 트인 하늘을 따라 날거나 앞을 가로질러 난다. 봄·여름에는 세 배 ---------- */
+const birdFlock = [], BIRD_LIMIT = LOW ? 2 : 3;
+let birdClock = 7, birdParts = null;
+function birdModel() {
+  birdParts ??= (() => {
+    const wing = new THREE.BufferGeometry();
+    // 어깨에서 바깥으로 갈수록 뒤로 젖혀지는 날개 한 쪽
+    wing.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, .07, 0, 0, -.06, .3, 0, -.02, .3, 0, -.02, 0, 0, -.06, .36, 0, -.13], 3));
+    wing.computeVertexNormals();
+    const tail = new THREE.BufferGeometry();
+    tail.setAttribute('position', new THREE.Float32BufferAttribute([-.045, 0, -.14, .045, 0, -.14, 0, 0, -.33, -.045, 0, -.14, 0, 0, -.33, .045, 0, -.14], 3));
+    tail.computeVertexNormals();
+    return {
+      wing, tail, body: new THREE.SphereGeometry(.07, 8, 6).scale(1, .82, 2.1), head: new THREE.SphereGeometry(.048, 8, 6),
+      dark: new THREE.MeshLambertMaterial({ color: '#25221f', side: THREE.DoubleSide }), light: new THREE.MeshLambertMaterial({ color: '#e7e3d8' }),
+    };
+  })();
+  const { wing, tail, body, head, dark, light } = birdParts, root = new THREE.Group();
+  const torso = new THREE.Mesh(body, dark), skull = new THREE.Mesh(head, dark), belly = new THREE.Mesh(body, light), back = new THREE.Mesh(tail, dark);
+  skull.position.set(0, .03, .15);
+  belly.scale.set(.82, .7, .62);
+  belly.position.set(0, -.018, .02);
+  const wingL = new THREE.Mesh(wing, dark), wingR = new THREE.Mesh(wing, dark);
+  wingL.position.set(.03, .02, .02);
+  wingR.position.set(-.03, .02, .02);
+  wingR.scale.x = -1;
+  root.add(torso, skull, belly, back, wingL, wingR);
+  root.scale.setScalar(1.25);
+  root.visible = false;
+  scene.add(root);
+  return { root, wingL, wingR, live: false };
+}
+function launchBird(lead = null) {
+  const bird = birdFlock.find(b => !b.live) ?? (birdFlock.length < BIRD_LIMIT * 3 ? (birdFlock.push(birdModel()), birdFlock[birdFlock.length - 1]) : null);
+  if (!bird) return null;
+  const speed = 6.5 + Math.random() * 2.5;
+  if (lead) {
+    // 무리: 앞선 새를 조금 떨어져 따라간다
+    bird.path = { ...lead.path, lateral: (lead.path.lateral ?? 0) + (Math.random() - .5) * 2.2, height: lead.path.height + (Math.random() - .5) * 1.4, s: (lead.path.s ?? 0) - lead.path.dir * (1.2 + Math.random() * 1.6), t0: -(1 + Math.random()) * .4 };
+  } else if (Math.random() < .65 && trail.length > 120) {
+    // 등산로를 따라: 앞에서 다가와 머리 위로 지나가거나, 뒤에서 앞질러 간다
+    const toward = Math.random() < .6;
+    bird.path = { kind: 'trail', dir: toward ? -1 : 1, s: clamp(player.s + (toward ? 48 + Math.random() * 20 : -14), 0, trail.length), lateral: (Math.random() - .5) * 2.4, height: 4.5 + Math.random() * 3.5, speed };
+  } else {
+    // 앞을 가로질러
+    const fx = player.x - camera.position.x, fz = player.z - camera.position.z, l = Math.hypot(fx, fz) || 1, ux = fx / l, uz = fz / l;
+    const ahead = 16 + Math.random() * 12, mx = player.x + ux * ahead, mz = player.z + uz * ahead, turn = (Math.random() < .5 ? 1 : -1) * (1.1 + Math.random() * .7);
+    const dx = ux * Math.cos(turn) - uz * Math.sin(turn), dz = ux * Math.sin(turn) + uz * Math.cos(turn);
+    const y = Math.max(groundHeight(mx, mz) + 12 + Math.random() * 5, camera.position.y + 3 + Math.random() * 4);
+    bird.path = { kind: 'cross', x: mx - dx * 34, z: mz - dz * 34, y, dx, dz, length: 68, speed };
+  }
+  bird.path.t0 ??= 0;
+  bird.t = bird.path.t0;
+  bird.flap = Math.random() * 6;
+  bird.live = true;
+  bird.root.visible = false;
+  return bird;
+}
+function stepBirds(dt) {
+  if (!trail) return;
+  const fx = seasonFx();
+  birdClock -= dt;
+  if (birdClock <= 0) {
+    birdClock = (16 + Math.random() * 12) / fx.birds;
+    if (birdFlock.filter(b => b.live).length < Math.round(BIRD_LIMIT * fx.birds)) {
+      const lead = launchBird();
+      // 봄·여름에는 두세 마리가 무리 지어 날 때가 많다
+      if (lead && fx.birds > 1 && Math.random() < .55) for (let n = Math.random() < .5 ? 1 : 2; n > 0; n--) launchBird(lead);
+    }
+  }
+  for (const bird of birdFlock) {
+    if (!bird.live) continue;
+    bird.t += dt;
+    if (bird.t < 0) continue;
+    const p = bird.path, bob = Math.sin(bird.t * 1.3 + bird.flap) * .45;
+    let x, y, z, heading, gone;
+    if (p.kind === 'trail') {
+      p.s += p.dir * p.speed * dt;
+      const at = trailAt(clamp(p.s, 0, trail.length));
+      x = at.x - at.tz * p.lateral;
+      z = at.z + at.tx * p.lateral;
+      y = at.y + p.height + bob;
+      heading = Math.atan2(at.tx * p.dir, at.tz * p.dir);
+      gone = p.s < 0 || p.s > trail.length || (p.dir < 0 ? p.s < player.s - 30 : p.s > player.s + 75);
+    } else {
+      const d = bird.t * p.speed;
+      x = p.x + p.dx * d;
+      z = p.z + p.dz * d;
+      y = p.y + bob;
+      heading = Math.atan2(p.dx, p.dz);
+      gone = d > p.length;
+    }
+    if (gone) { bird.live = false; bird.root.visible = false; continue; }
+    bird.root.position.set(x, y, z);
+    bird.root.rotation.set(-Math.cos(bird.t * 1.3 + bird.flap) * .12, heading, 0);
+    // 날갯짓 1.3초, 미끄러지듯 활공 0.8초를 되풀이한다
+    const cycle = (bird.t + bird.flap) % 2.1, flapping = cycle < 1.3, beat = flapping ? Math.sin(bird.t * 17) * .95 : .12 + Math.sin(bird.t * 3) * .05;
+    bird.wingL.rotation.z = beat;
+    bird.wingR.rotation.z = -beat;
+    bird.root.visible = true;
+  }
+}
+function clearBirds() {
+  for (const bird of birdFlock) { bird.live = false; bird.root.visible = false; }
+  birdClock = 7;
+}
+// 계절마다 곤충 비율을 바꾼다. 봄: 나비 세 배, 무당벌레가 잦다. 여름: 매미와 딱정벌레. 가을: 잠자리가 나비만큼, 메뚜기. 겨울: 없음
+const BUG_SEASON = {
+  spring: { flutter: 3, ladybug: 3, dart: 0, cicada: 0, stag: 0, rhino: 0, locust: .3 },
+  summer: { cicada: 2, ladybug: .6 },
+  autumn: { cicada: 0, stag: 0, rhino: 0, locust: 1.5, ladybug: .3, dart: 'match' },
+  winter: {},
+};
+const seasonBugLists = {};
+function seasonBugs() {
+  const now = course?.season ?? season;
+  return seasonBugLists[now] ??= (() => {
+    const table = BUG_SEASON[now], sum = way => INSECTS.filter(k => k.way === way).reduce((total, k) => total + k.odds, 0);
+    return INSECTS.map(kind => {
+      let f = table[kind.id] ?? table[kind.way] ?? 1;
+      if (f === 'match') f = sum('flutter') / sum('dart');
+      return { kind, odds: kind.odds * f };
+    }).filter(item => item.odds > 0);
+  })();
+}
+
+/* ---------- 떨어지는 것: 봄에는 벚꽃잎, 가을에는 단풍잎, 겨울에는 크기가 여러 가지인 눈송이 ---------- */
+const drift = { sets: [], box: 9, t: 0 };
+// 떨어지는 것들은 카메라 앞쪽 6 m를 가운데로 둔 상자 안에서만 돌게 해, 화면에 많이 보이게 한다
+const driftCenter = new THREE.Vector3(), driftLook = new THREE.Vector3();
+function driftAnchor() {
+  camera.getWorldDirection(driftLook);
+  driftLook.y = 0;
+  if (driftLook.lengthSq() < 1e-6) driftLook.set(0, 0, 1);
+  driftLook.normalize();
+  return driftCenter.set(camera.position.x + driftLook.x * 6, camera.position.y, camera.position.z + driftLook.z * 6);
+}
+function driftTexture(draw, size = 64) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  g.translate(size / 2, size / 2);
+  g.scale(size / 64, size / 64);
+  draw(g);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function clearDrift() {
+  for (const set of drift.sets) { scene.remove(set.mesh); set.mesh.geometry.dispose(); set.mesh.material.map?.dispose(); set.mesh.material.dispose(); }
+  drift.sets = [];
+}
+function setupDrift() {
+  clearDrift();
+  const now = course?.season;
+  if (!now || now === 'summer' || REDUCED) return;
+  const cam = driftAnchor(), B = drift.box;
+  const scatter = (i, out) => { out[i] = cam.x + (Math.random() - .5) * 2 * B; out[i + 1] = cam.y - 2 + Math.random() * 9; out[i + 2] = cam.z + (Math.random() - .5) * 2 * B; };
+  if (now === 'winter') {
+    const flake = driftTexture(g => {
+      const k = g.createRadialGradient(0, 0, 0, 0, 0, 30);
+      k.addColorStop(0, 'rgba(255,255,255,1)'); k.addColorStop(.45, 'rgba(255,255,255,.8)'); k.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = k; g.fillRect(-32, -32, 64, 64);
+    });
+    // 가루눈, 보통 눈, 함박눈
+    for (const [count, size, speed] of [[LOW ? 500 : 1100, .06, .75], [LOW ? 260 : 560, .11, 1.05], [LOW ? 90 : 190, .2, 1.4]]) {
+      const pos = new Float32Array(count * 3), seeds = new Float32Array(count);
+      for (let i = 0; i < count; i++) { scatter(i * 3, pos); seeds[i] = Math.random() * 100; }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const mesh = new THREE.Points(geo, new THREE.PointsMaterial({ map: flake, size, transparent: true, depthWrite: false, opacity: 1, color: '#ffffff' }));
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      drift.sets.push({ mesh, pos, seeds, count, speed, points: true });
+    }
+    return;
+  }
+  // 벚꽃잎 두 모양. 가을 잎은 갈래 길이와 각도가 저마다 다른 단풍잎 세 가지와 은행잎, 떡갈잎. 모두 잎자루가 달려 있다
+  const petal = (notch) => g => { g.fillStyle = '#fff'; g.beginPath(); g.moveTo(0, 26); g.bezierCurveTo(-30, 4, -20, -26, -4 - notch, -24); g.lineTo(0, -18 + notch); g.lineTo(4 + notch, -24); g.bezierCurveTo(20, -26, 30, 4, 0, 26); g.fill(); };
+  const stem = (g, x0, y0, rand, y1 = 31) => {
+    // 잎자루: 잎보다 조금 짙게, 끝이 살짝 휜다
+    g.strokeStyle = '#9c9c9c';
+    g.lineWidth = 2.3;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(x0, y0);
+    g.quadraticCurveTo(x0 + (rand() - .5) * 5, (y0 + y1) / 2, x0 + (rand() - .5) * 6, y1);
+    g.stroke();
+  };
+  const maple = seed => g => {
+    const rand = mulberry(seed), cy = -4, base = 24 + rand() * 4;
+    // 다섯 갈래: 가운데가 가장 길고 아래 두 갈래가 가장 짧다. 갈래마다 길이, 각도, 너비가 조금씩 다르다
+    const lobes = [[0, .94, .5], [-1, .78, .46], [1, .78, .46], [-2, .5, .4], [2, .5, .4]].map(([k, len, w]) => ({
+      a: -Math.PI / 2 + k * (.92 + rand() * .2) + (rand() - .5) * .12, len: base * (len + (rand() - .5) * .18), w: w + .07 + (rand() - .5) * .14,
+    }));
+    const valley = base * (.34 + rand() * .1), teeth = rand() * 6.283;
+    g.fillStyle = '#fff';
+    g.beginPath();
+    for (let i = 0; i <= 180; i++) {
+      const a = i / 180 * Math.PI * 2;
+      let reach = 0;
+      for (const lobe of lobes) {
+        const gap = Math.abs(Math.atan2(Math.sin(a - lobe.a), Math.cos(a - lobe.a)));
+        reach = Math.max(reach, (lobe.len - valley) * Math.pow(Math.max(0, 1 - gap / lobe.w), 1.35));
+      }
+      // 갈래 가장자리의 잔 톱니
+      const r = valley + reach + Math.abs(Math.sin(a * 23 + teeth)) * 1.3 * Math.min(1, reach / 4);
+      const x = Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      if (i) g.lineTo(x, y); else g.moveTo(x, y);
+    }
+    g.fill();
+    // 잎맥: 가운데에서 갈래 끝으로
+    g.strokeStyle = 'rgba(0,0,0,.2)';
+    g.lineWidth = 1.1;
+    g.beginPath();
+    for (const lobe of lobes) { g.moveTo(0, cy); g.lineTo(Math.cos(lobe.a) * lobe.len * .86, cy + Math.sin(lobe.a) * lobe.len * .86); }
+    g.stroke();
+    // 잎자루는 잎 길이의 절반쯤
+    stem(g, 0, cy + valley * .7, rand, cy + valley + 12 + rand() * 4);
+  };
+  const ginkgo = g => {
+    const rand = mulberry(71);
+    g.fillStyle = '#fff';
+    g.beginPath(); g.moveTo(0, 18); g.quadraticCurveTo(-6, -2, -27, -15); g.quadraticCurveTo(-14, -33, -2, -25); g.lineTo(0, -19); g.lineTo(2, -25); g.quadraticCurveTo(14, -33, 27, -15); g.quadraticCurveTo(6, -2, 0, 18); g.fill();
+    stem(g, 0, 16, rand, 27);
+  };
+  const oak = g => {
+    const rand = mulberry(73);
+    g.fillStyle = '#fff';
+    g.beginPath();
+    for (let i = 0; i <= 48; i++) { const a = i / 48 * Math.PI * 2, k = .76 + Math.abs(Math.sin(a * 3.5)) * .24; g.lineTo(Math.cos(a) * 14 * k, -5 - Math.sin(a) * 23 * k); }
+    g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.2)'; g.lineWidth = 1.1; g.beginPath(); g.moveTo(0, 17); g.lineTo(0, -24); g.stroke();
+    stem(g, 0, 16, rand, 26);
+  };
+  const spring = now === 'spring', tones = spring ? LEAF_TONES.blossom : [...LEAF_TONES.yellow, ...LEAF_TONES.orange, ...LEAF_TONES.orange, ...LEAF_TONES.brown];
+  // [모양, 장수]. 가을 잎은 예전의 절반
+  const looks = spring ? [[petal(0), 120], [petal(4), 120]] : [[maple(11), 22], [maple(29), 22], [maple(47), 22], [ginkgo, 23], [oak, 23]];
+  const size = spring ? .08 : .19, tone = new THREE.Color(), density = driftDensity();
+  for (const [look, count] of looks) {
+    const each = Math.max(4, Math.round(count * (LOW ? .5 : 1)));
+    const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: driftTexture(look, spring ? 64 : 96), alphaTest: .4, side: THREE.DoubleSide, color: '#e2e2e2' }), each);
+    const items = [];
+    for (let i = 0; i < each; i++) {
+      const p = new Float32Array(3), grow = .85 + Math.random() * .3;
+      scatter(0, p);
+      items.push({
+        x: p[0], y: p[1], z: p[2], fall: (spring ? .5 : .85) + Math.random() * .5, phase: Math.random() * 6.283, sway: .4 + Math.random() * .6,
+        rx: Math.random() * 6, ry: Math.random() * 6, rz: Math.random() * 6, vx: (Math.random() - .5) * 3, vy: (Math.random() - .5) * 3, vz: (Math.random() - .5) * 3,
+        // 한 장마다 가로세로 비율을 조금씩 다르게
+        sx: grow * (.86 + Math.random() * .28), sy: grow * (.86 + Math.random() * .28), sleep: Math.random() < density ? 0 : Math.random() * 1.5,
+      });
+      mesh.setColorAt(i, tone.set(pickTone(tones, Math.random)));
+    }
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+    drift.sets.push({ mesh, items });
+  }
+}
+// 정상 둘레에는 나무가 없으므로, 정상에 가까워질수록 꽃잎과 단풍잎이 드물어지다가 정상에서는 떨어지지 않는다
+function driftDensity() {
+  if (!trail) return 1;
+  return smooth(18, 115, Math.hypot(camera.position.x - trail.xs[trail.n], camera.position.z - trail.zs[trail.n]));
+}
+const driftObject = new THREE.Object3D(), driftHidden = new THREE.Matrix4().makeScale(0, 0, 0);
+function stepDrift(dt) {
+  if (!drift.sets.length) return;
+  drift.t += dt;
+  const cam = driftAnchor(), B = drift.box, t = drift.t;
+  const wrap = (get, set) => {
+    let [x, y, z] = get();
+    if (y < cam.y - 3 || y > cam.y + 9) { x = cam.x + (Math.random() - .5) * 2 * B; z = cam.z + (Math.random() - .5) * 2 * B; y = y < cam.y - 3 ? cam.y + 6 + Math.random() * 2.5 : cam.y - 2; }
+    if (x - cam.x > B) x -= 2 * B; else if (x - cam.x < -B) x += 2 * B;
+    if (z - cam.z > B) z -= 2 * B; else if (z - cam.z < -B) z += 2 * B;
+    set(x, y, z);
+  };
+  const density = driftDensity();
+  for (const set of drift.sets) {
+    if (set.points) {
+      const p = set.pos;
+      for (let i = 0; i < set.count; i++) {
+        const k = i * 3, seed = set.seeds[i];
+        p[k + 1] -= set.speed * dt;
+        p[k] += (Math.sin(t * .9 + seed) * .35 + .12) * dt;
+        p[k + 2] += Math.cos(t * .7 + seed * 1.3) * .3 * dt;
+        wrap(() => [p[k], p[k + 1], p[k + 2]], (x, y, z) => { p[k] = x; p[k + 1] = y; p[k + 2] = z; });
+      }
+      set.mesh.geometry.attributes.position.needsUpdate = true;
+      continue;
+    }
+    set.items.forEach((it, i) => {
+      // 쉬는 잎: 정상 가까이에서는 새로 떨어지지 않고 숨어 있다가, 숲이 짙어지면 다시 위에서 떨어진다
+      if (it.sleep > 0) {
+        it.sleep -= dt;
+        if (it.sleep > 0 || Math.random() >= density) {
+          if (it.sleep <= 0) it.sleep = .4 + Math.random() * .8;
+          set.mesh.setMatrixAt(i, driftHidden);
+          return;
+        }
+        it.x = cam.x + (Math.random() - .5) * 2 * B;
+        it.z = cam.z + (Math.random() - .5) * 2 * B;
+        it.y = cam.y + 6 + Math.random() * 2.5;
+      }
+      // 팔랑팔랑: 좌우로 흔들리며 내려오고 빙글빙글 돈다
+      it.y -= it.fall * dt * (.75 + .25 * Math.sin(t * 2.2 + it.phase));
+      it.x += Math.sin(t * 1.6 + it.phase) * it.sway * dt;
+      it.z += Math.cos(t * 1.3 + it.phase) * it.sway * .7 * dt;
+      it.rx += it.vx * dt; it.ry += it.vy * dt; it.rz += it.vz * dt;
+      if (it.y < cam.y - 3 && Math.random() >= density) {
+        it.sleep = .4 + Math.random() * .8;
+        set.mesh.setMatrixAt(i, driftHidden);
+        return;
+      }
+      wrap(() => [it.x, it.y, it.z], (x, y, z) => { it.x = x; it.y = y; it.z = z; });
+      driftObject.position.set(it.x, it.y, it.z);
+      driftObject.rotation.set(it.rx, it.ry, it.rz);
+      driftObject.scale.set(it.sx ?? 1, it.sy ?? 1, 1);
+      driftObject.updateMatrix();
+      set.mesh.setMatrixAt(i, driftObject.matrix);
+    });
+    set.mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+
+/* ---------- 여름 계곡의 개구리: 물가에 앉아 목을 부풀리다가 폴짝 뛴다 ---------- */
+const frogs = [], FROG_LIMIT = LOW ? 2 : 3;
+let frogGeo = null, frogMat = null, frogClock = 3;
+function frogModel() {
+  frogGeo ??= (() => {
+    const m = newSolid();
+    egg(m, 0, .026, -.004, .03, .02, .04, '#5c9a38', '#efe7bf', 9);
+    egg(m, 0, .028, .034, .026, .017, .02, '#629f3c', '#efe7bf', 9);
+    for (const s of [-1, 1]) {
+      egg(m, s * .015, .044, .038, .0085, .0085, .0085, '#4f8a30', '#4f8a30', 7);
+      egg(m, s * .018, .047, .043, .004, .004, .003, '#17140f', '#17140f', 5);
+      egg(m, s * .032, .014, -.02, .012, .011, .028, '#4f8a30', '#d9d2a6', 7);
+      egg(m, s * .036, .005, .006, .012, .004, .014, '#5c9a38', '#5c9a38', 6);
+      egg(m, s * .022, .007, .04, .006, .005, .012, '#5c9a38', '#5c9a38', 6);
+      egg(m, s * .012, .02, -.02, .007, .004, .007, '#3f6e28', '#3f6e28', 5);
+    }
+    return toSolid(m);
+  })();
+  frogMat ??= new THREE.MeshLambertMaterial({ vertexColors: true });
+  const mesh = new THREE.Mesh(frogGeo, frogMat);
+  mesh.scale.setScalar(2.4);
+  mesh.castShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
+function clearFrogs() { for (const frog of frogs) scene.remove(frog.mesh); frogs.length = 0; }
+function frogBank() {
+  const near = [];
+  for (const stream of trail.streams) {
+    if (player.s < stream.a - 60 || player.s > stream.b + 60) continue;
+    for (const p of stream.points) { const d = Math.hypot(p.x - player.x, p.z - player.z); if (d > 4 && d < 26) near.push(p); }
+  }
+  if (!near.length) return null;
+  const p = near[Math.floor(Math.random() * near.length)], a = Math.random() * 6.283, r = (p.w ?? 1) * .9 + .3 + Math.random() * .7;
+  return { x: p.x + Math.cos(a) * r, z: p.z + Math.sin(a) * r };
+}
+function stepFrogs(dt) {
+  if ((course?.season ?? season) !== 'summer' || !trail?.streams.length) return;
+  frogClock -= dt;
+  if (frogClock <= 0) {
+    frogClock = 4 + Math.random() * 4;
+    if (frogs.length < FROG_LIMIT) {
+      const spot = frogBank();
+      if (spot) frogs.push({ mesh: frogModel(), x: spot.x, z: spot.z, y: groundHeight(spot.x, spot.z), yaw: Math.random() * 6.283, rest: 1 + Math.random() * 3, hop: null, t: 0 });
+    }
+  }
+  for (let i = frogs.length - 1; i >= 0; i--) {
+    const f = frogs[i];
+    f.t += dt;
+    if (Math.hypot(f.x - player.x, f.z - player.z) > 40) { scene.remove(f.mesh); frogs.splice(i, 1); continue; }
+    if (!f.hop) {
+      f.rest -= dt;
+      // 앉아 있는 동안 목을 부풀린다. 등산객이 아주 가까이 오면 바로 뛴다
+      const close = Math.hypot(f.x - player.x, f.z - player.z) < 2.2;
+      if (f.rest <= 0 || close) {
+        const turn = close ? Math.atan2(f.x - player.x, f.z - player.z) : f.yaw + (Math.random() - .5) * 1.6, d = .45 + Math.random() * .6;
+        const tx = f.x + Math.sin(turn) * d, tz = f.z + Math.cos(turn) * d;
+        f.hop = { x0: f.x, z0: f.z, y0: f.y, x1: tx, z1: tz, y1: groundHeight(tx, tz), u: 0, time: .38 + d * .2 };
+        f.yaw = turn;
+      }
+      f.mesh.scale.set(2.4, 2.4 * (1 + Math.max(0, Math.sin(f.t * 5)) * .04), 2.4);
+    } else {
+      const h = f.hop;
+      h.u = Math.min(1, h.u + dt / h.time);
+      f.x = lerp(h.x0, h.x1, h.u); f.z = lerp(h.z0, h.z1, h.u);
+      f.y = lerp(h.y0, h.y1, h.u) + Math.sin(Math.PI * h.u) * .22;
+      f.mesh.scale.set(2.4, 2.4 * (1 + Math.sin(Math.PI * h.u) * .25), 2.4 * (1 + Math.sin(Math.PI * h.u) * .15));
+      if (h.u >= 1) { f.hop = null; f.rest = 1.5 + Math.random() * 4; }
+    }
+    f.mesh.position.set(f.x, f.y + .005, f.z);
+    f.mesh.rotation.set(f.hop ? -Math.sin(Math.PI * f.hop.u) * .35 : 0, f.yaw, 0);
+  }
+}
+
+// 여름 소리: 숲에는 매미 세 가지, 계곡 가까이에서는 개구리 두 가지
+const natureClock = { cicada: 3, frog: 2 };
+function stepNatureSound(dt) {
+  if ((course?.season ?? season) !== 'summer') return;
+  natureClock.cicada -= dt;
+  if (natureClock.cicada <= 0) { natureClock.cicada = 4.5 + Math.random() * 7; sound.cicada(); }
+  natureClock.frog -= dt;
+  if (natureClock.frog <= 0) {
+    const wet = trail?.streams.length ? waterLevel() : 0;
+    natureClock.frog = wet > .2 ? 1.6 + Math.random() * 3.2 / wet : 2;
+    if (wet > .2) sound.frog(Math.random() < .55 ? 0 : 1, Math.min(1, wet * 1.3));
+  }
+}
 function stepWild(dt) {
   for (const key in wildClock) wildClock[key] -= dt;
+  const fx = seasonFx();
   if (wildClock.bug <= 0) {
-    wildClock.bug = 24 + Math.random() * 12;
-    if (bugs.length < WILD_LIMIT.bugs) addBug(weighted(INSECTS));
+    wildClock.bug = (24 + Math.random() * 12) / Math.max(fx.bugs, .5);
+    if (fx.bugs > 0 && bugs.length < Math.round(WILD_LIMIT.bugs * fx.bugs)) addBug(weighted(seasonBugs()).kind);
   }
   const small = beasts.filter(b => !b.kind.big && !b.kind.myth).length, big = beasts.filter(b => b.kind.big && !b.kind.myth).length;
   if (wildClock.small <= 0) {
@@ -9031,9 +9591,14 @@ function stepWild(dt) {
     wildClock.myth = done ? 420 + Math.random() * 120 : 8;
   }
   if (wildClock.buzz <= 0) {
-    wildClock.buzz = 70 + Math.random() * 110;
-    sound.buzz(flyerSide());
+    wildClock.buzz = (70 + Math.random() * 110) / Math.max(fx.bugs, .5);
+    if (fx.bugs > 0) sound.buzz(flyerSide());
   }
+  stepBirds(dt);
+  stepDrift(dt);
+  stepFrogs(dt);
+  stepNatureSound(dt);
+  if (snowmen.length) checkSnowmen();
   for (let i = bugs.length - 1; i >= 0; i--) if (stepBug(bugs[i], dt)) dropBug(i);
   for (let i = beasts.length - 1; i >= 0; i--) {
     if (beasts[i].step(dt)) { beasts[i].retire(); beasts[i] = beasts[beasts.length - 1]; beasts.pop(); continue; }
@@ -9045,6 +9610,9 @@ function stepWild(dt) {
   }
 }
 function clearWild() {
+  clearBirds();
+  clearFrogs();
+  clearDrift();
   while (bugs.length) dropBug(bugs.length - 1);
   for (const beast of beasts) beast.retire();
   beasts.length = 0;
@@ -9052,7 +9620,12 @@ function clearWild() {
 }
 
 /* ---------- 소리: 전부 Web Audio로 합성한다 ---------- */
+// 가을에는 흙길과 길섶에 마른 낙엽이 깔려 있어 바스락거린다
 function stepSurface() {
+  const kind = groundSurface();
+  return course.season === 'autumn' && (kind === 'leaves' || kind === 'grass' || (kind === 'dirt' && Math.random() < .75)) ? 'dry' : kind;
+}
+function groundSurface() {
   if (course.winter && (player.off > 2.4 || trail.snow[player.index] > .5)) return 'snow';
   if (player.off > 2.4) {
     const splat = trail.splat;
@@ -9133,6 +9706,8 @@ class Sound {
       stone: d => { this.thump(d, sr, 150 + Math.random() * 70, 70, .55); this.thump(d, sr, 900 + Math.random() * 500, 260, .2); this.grains(d, sr, { count: 20, spread: .35, amp: .3, shortest: .001, longest: .002 }); },
       wood: d => { this.thump(d, sr, 165 + Math.random() * 45, 28, .62); this.thump(d, sr, 340 + Math.random() * 90, 46, .34); this.grains(d, sr, { count: 14, spread: .3, amp: .12, shortest: .001, longest: .002 }); },
       leaves: d => { this.thump(d, sr, 72, 40, .3); this.grains(d, sr, { count: 240, spread: 1, amp: .2, shortest: .002, longest: .007 }); },
+      // 마른 낙엽: 둔한 발소리 위로 잎이 바스락 부서지는 소리가 촘촘하고, 굵게 꺾이는 소리가 몇 번 섞인다
+      dry: d => { this.thump(d, sr, 66, 38, .22); this.grains(d, sr, { count: 340, spread: 1, amp: .26, shortest: .0012, longest: .005 }); this.grains(d, sr, { count: 28, spread: .85, amp: .48, shortest: .003, longest: .011 }); },
       grass: d => { this.thump(d, sr, 70, 42, .26); this.grains(d, sr, { count: 150, spread: 1, amp: .1, shortest: .004, longest: .012 }); },
       // 눈: 낮게 눌리는 소리 위로 잘게 부서지는 뽀드득 소리가 길게 이어진다
       snow: d => { this.thump(d, sr, 58, 26, .2); this.grains(d, sr, { count: 520, spread: .9, amp: .3, shortest: .0005, longest: .0018 }); this.grains(d, sr, { count: 70, spread: .55, amp: .42, shortest: .002, longest: .006 }); },
@@ -9163,7 +9738,7 @@ class Sound {
     source.playbackRate.value = .88 + Math.random() * .26;
     const low = ctx.createBiquadFilter();
     low.type = 'lowpass';
-    low.frequency.value = { dirt: 2200, gravel: 5200, stone: 4200, wood: 2600, leaves: 5600, grass: 3600, snow: 4600, crunch: 3800 }[voice];
+    low.frequency.value = { dirt: 2200, gravel: 5200, stone: 4200, wood: 2600, leaves: 5600, grass: 3600, snow: 4600, crunch: 3800, dry: 6600 }[voice];
     const high = ctx.createBiquadFilter();
     high.type = 'highpass'; high.frequency.value = 90;
     const gain = ctx.createGain();
@@ -9272,6 +9847,98 @@ class Sound {
     bus.connect(this.room);
     [880, 1175, 1568, 2093].forEach((f, i) => this.tone(bus, at + i * .13, .7, [[0, f], [1, f]], 1 - i * .14));
     setTimeout(() => bus.disconnect(), 2600);
+  }
+  // 매미: 발음판이 빠르게 떨리는 딸깍임(톱니파)을 몸통의 울림(좁은 띠)으로 거른다. 0 참매미 '맴맴맴 매애앰', 1 말매미 길게 '쏴아아', 2 애매미 '씨유 씨유 쯔르르'
+  cicada(type = Math.floor(Math.random() * 3)) {
+    if (!this.audible()) return;
+    const { ctx } = this, at = ctx.currentTime + .05;
+    const click = ctx.createOscillator(), band = ctx.createBiquadFilter(), body = ctx.createBiquadFilter(), amp = ctx.createGain(), bus = ctx.createGain(), pan = ctx.createStereoPanner(), send = ctx.createGain();
+    click.type = 'sawtooth';
+    band.type = body.type = 'bandpass';
+    pan.pan.value = Math.random() * 1.6 - .8;
+    send.gain.value = .55;
+    bus.gain.value = .045 + Math.random() * .035;
+    amp.gain.value = 0;
+    click.connect(band).connect(body).connect(amp).connect(bus).connect(pan);
+    pan.connect(this.master);
+    pan.connect(send).connect(this.room);
+    let length;
+    if (type === 0) {
+      click.frequency.value = 230;
+      band.frequency.value = 3700; band.Q.value = 6; body.frequency.value = 3900; body.Q.value = 2;
+      const count = 10 + Math.floor(Math.random() * 6), beat = .27;
+      for (let k = 0; k < count; k++) {
+        const t = at + k * beat, swell = Math.min(1, .35 + k / count);
+        amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(swell, t + .03); amp.gain.setValueAtTime(swell, t + .14); amp.gain.linearRampToValueAtTime(0, t + .21);
+        band.frequency.setValueAtTime(3300, t); band.frequency.linearRampToValueAtTime(4200, t + .16);
+      }
+      const end = at + count * beat;
+      amp.gain.setValueAtTime(0, end); amp.gain.linearRampToValueAtTime(1, end + .12); amp.gain.setValueAtTime(1, end + .8); amp.gain.linearRampToValueAtTime(0, end + 1.5);
+      band.frequency.setValueAtTime(4100, end); band.frequency.linearRampToValueAtTime(3100, end + 1.5);
+      length = count * beat + 1.6;
+    } else if (type === 1) {
+      click.frequency.value = 150;
+      band.frequency.value = 4600; band.Q.value = 2.4; body.frequency.value = 5200; body.Q.value = 1.3;
+      length = 6 + Math.random() * 3;
+      amp.gain.setValueAtTime(0, at); amp.gain.linearRampToValueAtTime(1, at + 1.7); amp.gain.setValueAtTime(1, at + length - 2.2); amp.gain.linearRampToValueAtTime(0, at + length);
+      const lfo = ctx.createOscillator(), depth = ctx.createGain();
+      lfo.frequency.value = 46; depth.gain.value = .3;
+      lfo.connect(depth).connect(amp.gain);
+      lfo.start(at); lfo.stop(at + length + .1);
+    } else {
+      click.frequency.value = 380;
+      band.frequency.value = 6000; band.Q.value = 7; body.frequency.value = 5600; body.Q.value = 2.2;
+      let t = at;
+      for (let r = 0; r < 2; r++) {
+        for (let k = 0; k < 3; k++) {
+          amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(1, t + .04); amp.gain.linearRampToValueAtTime(.25, t + .26); amp.gain.linearRampToValueAtTime(0, t + .3);
+          band.frequency.setValueAtTime(6600, t); band.frequency.exponentialRampToValueAtTime(4300, t + .28);
+          t += .38;
+        }
+        for (let k = 0; k < 10; k++) { amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(.8, t + .015); amp.gain.linearRampToValueAtTime(0, t + .055); band.frequency.setValueAtTime(5300, t); t += .075; }
+        t += .35;
+      }
+      length = t - at;
+    }
+    click.start(at);
+    click.stop(at + length + .1);
+    click.onended = () => { bus.disconnect(); pan.disconnect(); send.disconnect(); };
+    this.counts.cicada = (this.counts.cicada ?? 0) + 1;
+  }
+  // 개구리: 0 참개구리 '개굴개굴'(낮고 거칠게 두 마디), 1 청개구리 '깩깩깩'(높고 짧게 여러 번). near는 계곡과 가까운 정도
+  frog(type = 0, near = 1) {
+    if (!this.audible()) return;
+    const { ctx } = this, at = ctx.currentTime + .04, bus = ctx.createGain(), pan = ctx.createStereoPanner(), send = ctx.createGain(), low = ctx.createBiquadFilter();
+    pan.pan.value = Math.random() * 1.4 - .7;
+    send.gain.value = .6;
+    low.type = 'lowpass';
+    low.frequency.value = type ? 3400 : 1500;
+    bus.gain.value = (.05 + Math.random() * .035) * near;
+    bus.connect(low).connect(pan);
+    pan.connect(this.master);
+    pan.connect(send).connect(this.room);
+    const croak = (t, length, from, to, rate, peak) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain(), trem = ctx.createOscillator(), depth = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(from, t);
+      osc.frequency.linearRampToValueAtTime(to, t + length);
+      gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(peak, t + .012); gain.gain.setValueAtTime(peak, t + length * .7); gain.gain.linearRampToValueAtTime(0, t + length);
+      trem.type = 'square';
+      trem.frequency.value = rate;
+      depth.gain.value = peak * .85;
+      trem.connect(depth).connect(gain.gain);
+      osc.connect(gain).connect(bus);
+      osc.start(t); trem.start(t);
+      osc.stop(t + length + .02); trem.stop(t + length + .02);
+    };
+    let t = at;
+    if (type === 0) {
+      for (let k = 2 + Math.floor(Math.random() * 3); k > 0; k--) { croak(t, .11, 330, 300, 38, .9); croak(t + .15, .17, 290, 235, 31, .8); t += .44 + Math.random() * .12; }
+    } else {
+      for (let k = 5 + Math.floor(Math.random() * 5); k > 0; k--) { croak(t, .06, 1750, 1450, 90, .7); t += .13; }
+    }
+    setTimeout(() => { bus.disconnect(); low.disconnect(); pan.disconnect(); send.disconnect(); }, (t - at + 1.5) * 1000);
+    this.counts.frog = (this.counts.frog ?? 0) + 1;
   }
   // 나뭇잎을 돌담에 꾹 눌러 붙이는 소리
   pat() {
@@ -10153,6 +10820,7 @@ function bindControls() {
   $('flower-tag').addEventListener('click', () => { if (flowerNear) openFlora(flowerNear.id); });
   addEventListener('keyup', e => { if (e.code === 'Escape') $('flora').hidden = true; });
   $('start').addEventListener('click', () => enterHike(pickedMountain?.id));
+  buildSeasonPicks();
   $('trial').addEventListener('click', () => enterHike(TRIAL.id));
   // 고화질은 모형을 처음 만들 때 정해지므로, 바꾸면 페이지를 다시 연다
   const hdButton = $('hd-toggle');
@@ -10238,9 +10906,169 @@ function placeEveryone(stamina) {
   });
   focus.copy(player.model.root.position);
 }
+/* ---------- 눈사람: 겨울 산길에 여덟 가지 가운데 세 가지가 서 있다. 보면 기운 +1 ---------- */
+const SNOWMEN = ['당근코 눈사람', '털모자 눈사람', '양동이 눈사람', '갓 쓴 선비 눈사람', '귀마개 눈사람', '등산객 눈사람', '곰 눈사람', '눈사람 가족'];
+let snowmanMats = null;
+function snowmanModel(design) {
+  const m = snowmanMats ??= {
+    snow: new THREE.MeshLambertMaterial({ color: '#f3f6fa' }), coal: new THREE.MeshLambertMaterial({ color: '#1e1d1f' }), carrot: new THREE.MeshLambertMaterial({ color: '#ef7a22' }),
+    wood: new THREE.MeshLambertMaterial({ color: '#6b4a2e' }), red: new THREE.MeshLambertMaterial({ color: '#d23a2e' }), green: new THREE.MeshLambertMaterial({ color: '#2f7a46' }),
+    blue: new THREE.MeshLambertMaterial({ color: '#3a6fc4' }), pink: new THREE.MeshLambertMaterial({ color: '#f08fb4' }), cheek: new THREE.MeshLambertMaterial({ color: '#f4b2c2' }),
+    white: new THREE.MeshLambertMaterial({ color: '#ffffff' }), tin: new THREE.MeshLambertMaterial({ color: '#9aa3ab' }), black: new THREE.MeshLambertMaterial({ color: '#17161a' }),
+    yellow: new THREE.MeshLambertMaterial({ color: '#f1c22e' }), orange: new THREE.MeshLambertMaterial({ color: '#ec8a2a' }), brown: new THREE.MeshLambertMaterial({ color: '#7a5233' }),
+    pine: new THREE.MeshLambertMaterial({ color: '#2f6a3c' }), straw: new THREE.MeshLambertMaterial({ color: '#d9b45a' }), gat: new THREE.MeshLambertMaterial({ color: '#141317', transparent: true, opacity: .88 }),
+  };
+  const g = new THREE.Group(), up = new THREE.Vector3(0, 1, 0);
+  const add = (geo, mat, x, y, z, scale = null) => {
+    const o = new THREE.Mesh(geo, mat);
+    o.position.set(x, y, z);
+    if (scale) o.scale.set(...scale);
+    o.castShadow = true;
+    g.add(o);
+    return o;
+  };
+  const ball = (r, y, x = 0, z = 0, squash = .93) => add(new THREE.SphereGeometry(r, 22, 16), m.snow, x, y, z, [1, squash, 1]);
+  const dot = (mat, r, x, y, z) => add(new THREE.SphereGeometry(r, 10, 8), mat, x, y, z);
+  const stick = (from, to, r = .017, mat = m.wood) => {
+    const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to), o = add(new THREE.CylinderGeometry(r * .65, r, a.distanceTo(b), 7), mat, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+    o.quaternion.setFromUnitVectors(up, b.clone().sub(a).normalize());
+    return o;
+  };
+  // 얼굴: 숯 눈, 당근 코, 숯 조각 웃음
+  const face = (hy, hr, { nose = .19, smile = 5, eyes = .028 } = {}) => {
+    for (const s of [-1, 1]) dot(m.coal, eyes, s * hr * .36, hy + hr * .24, hr * .9);
+    if (nose) { const o = add(new THREE.ConeGeometry(.032, nose, 10), m.carrot, 0, hy + hr * .02, hr * .94 + nose / 2); o.rotation.x = Math.PI / 2; }
+    for (let k = 0; k < smile; k++) { const a = (k / (smile - 1) - .5) * 1.5; dot(m.coal, .016, Math.sin(a) * hr * .46, hy - hr * .34 + (1 - Math.cos(a)) * hr * .24, Math.cos(a * .6) * hr * .86); }
+  };
+  // 나뭇가지 팔: 어깨에서 비스듬히 뻗고 끝에 잔가지가 갈라진다
+  const arms = (y, r, { lift = .3, mitten = null, reach = .46 } = {}) => {
+    for (const s of [-1, 1]) {
+      const from = [s * r * .82, y, 0], to = [s * (r + reach), y + lift, .06];
+      stick(from, to);
+      stick(to, [to[0] + s * .1, to[1] + .1, to[2] + .02], .009);
+      stick(to, [to[0] + s * .12, to[1] - .02, to[2] - .02], .009);
+      if (mitten) dot(mitten, .05, ...to);
+    }
+  };
+  const scarf = (y, r, mat, tail = 1, x = 0) => {
+    const ring = add(new THREE.TorusGeometry(r, .045, 8, 24), mat, x, y, 0);
+    ring.rotation.x = Math.PI / 2;
+    if (tail) { const o = add(new THREE.BoxGeometry(.1, .28, .035), mat, x + r * .55 * tail, y - .14, r * .8); o.rotation.z = .18 * tail; }
+  };
+  const buttons = (y0, step, r, n = 3) => { for (let k = 0; k < n; k++) dot(m.coal, .026, 0, y0 - k * step, Math.sqrt(Math.max(0, r * r - (k * step) ** 2)) * .97); };
+  const beanie = (hy, hr, mat, pom = m.white) => {
+    add(new THREE.SphereGeometry(hr * .98, 20, 12, 0, Math.PI * 2, 0, Math.PI * .5), mat, 0, hy + hr * .46, 0);
+    const rim = add(new THREE.TorusGeometry(hr * .9, .038, 8, 24), pom, 0, hy + hr * .48, 0);
+    rim.rotation.x = Math.PI / 2;
+    dot(pom, .07, 0, hy + hr * 1.46, 0);
+  };
+  if (design === 0) {
+    // 당근코 눈사람: 둥근 두 덩이, 빨간 목도리
+    ball(.4, .38); ball(.27, 1.0); face(1.0, .27); arms(.62, .4); scarf(.8, .22, m.red);
+  } else if (design === 1) {
+    // 털모자 눈사람: 세 덩이에 방울 달린 빨간 털모자와 벙어리장갑
+    ball(.38, .36); ball(.28, .9); ball(.2, 1.32); face(1.32, .2, { nose: .15 }); beanie(1.32, .2, m.red); scarf(1.14, .16, m.green); buttons(1.02, .11, .28); arms(.96, .28, { mitten: m.red, lift: .22 });
+  } else if (design === 2) {
+    // 양동이 눈사람: 비스듬히 쓴 양동이, 솔가지 팔, 기대 세운 빗자루
+    ball(.42, .4); ball(.28, 1.03); face(1.03, .28);
+    const pail = add(new THREE.CylinderGeometry(.17, .21, .24, 18, 1, true), m.tin, .03, 1.36, 0); pail.rotation.z = -.18;
+    const lid = add(new THREE.CircleGeometry(.17, 18), m.tin, .05, 1.48, 0); lid.rotation.set(-Math.PI / 2, 0, -.18);
+    for (const s of [-1, 1]) { const from = [s * .34, .68, 0], to = [s * .82, .98, .06]; stick(from, to); for (let k = 0; k < 4; k++) { const t = .45 + k * .16; dot(m.pine, .055, lerp(from[0], to[0], t), lerp(from[1], to[1], t) + .03, .06); } }
+    stick([.6, 0, .32], [.5, 1.05, .25], .02);
+    const broom = add(new THREE.ConeGeometry(.12, .32, 12), m.straw, .61, .14, .32); broom.rotation.z = .08;
+  } else if (design === 3) {
+    // 갓 쓴 선비 눈사람: 검은 갓, 잔가지 콧수염, 흰 수염
+    ball(.42, .4); ball(.28, 1.03); face(1.03, .28, { nose: .1, smile: 0 });
+    const brim = add(new THREE.CylinderGeometry(.42, .42, .012, 32), m.gat, 0, 1.25, 0);
+    add(new THREE.CylinderGeometry(.11, .13, .2, 20), m.gat, 0, 1.36, 0);
+    brim.renderOrder = 1;
+    for (const s of [-1, 1]) { stick([0, 1.0, .29], [s * .16, .96, .25], .012, m.brown); stick([s * .27, 1.24, 0], [s * .18, .84, .12], .004, m.black); }
+    const beard = add(new THREE.ConeGeometry(.09, .28, 14), m.white, 0, .82, .24); beard.rotation.x = Math.PI;
+    buttons(.62, .14, .42, 2); arms(.66, .42, { lift: .1 });
+  } else if (design === 4) {
+    // 귀마개 눈사람: 통통한 몸, 분홍 귀마개와 발그레한 볼
+    ball(.44, .41, 0, 0, .9); ball(.31, 1.05, 0, 0, .9); face(1.05, .31, { nose: .12 });
+    const band = add(new THREE.TorusGeometry(.32, .025, 8, 24, Math.PI), m.pink, 0, 1.08, 0); band.rotation.y = Math.PI / 2;
+    for (const s of [-1, 1]) { dot(m.pink, .085, s * .31, 1.08, 0); add(new THREE.SphereGeometry(.05, 10, 8), m.cheek, s * .19, .98, .25, [1, .6, .4]); }
+    scarf(.8, .26, m.blue); arms(.66, .44, { lift: .34, mitten: m.blue });
+  } else if (design === 5) {
+    // 등산객 눈사람: 노란 모자, 주황 배낭, 등산 스틱 두 개
+    ball(.41, .39); ball(.28, 1.01); face(1.01, .28);
+    add(new THREE.SphereGeometry(.27, 20, 12, 0, Math.PI * 2, 0, Math.PI * .5), m.yellow, 0, 1.14, 0);
+    const peak = add(new THREE.CylinderGeometry(.17, .17, .025, 20, 1, false, -Math.PI / 2, Math.PI), m.yellow, 0, 1.15, .19); peak.scale.z = 1.2;
+    add(new THREE.BoxGeometry(.4, .44, .2), m.orange, 0, .52, -.42);
+    stick([-.2, .78, -.28], [-.14, .3, -.4], .02, m.black); stick([.2, .78, -.28], [.14, .3, -.4], .02, m.black);
+    scarf(.82, .23, m.red);
+    for (const s of [-1, 1]) { stick([s * .36, .62, 0], [s * .62, .55, .2]); stick([s * .62, 0, .28], [s * .62, 1.0, .2], .012, m.tin); dot(m.black, .03, s * .62, 1.0, .2); }
+  } else if (design === 6) {
+    // 곰 눈사람: 동그란 귀, 까만 코, 갈색 목도리
+    ball(.42, .4); ball(.3, 1.04);
+    for (const s of [-1, 1]) { ball(.1, 1.3, s * .2, 0, 1); add(new THREE.SphereGeometry(.055, 10, 8), m.brown, s * .2, 1.31, .06, [1, 1, .5]); }
+    for (const s of [-1, 1]) dot(m.coal, .03, s * .11, 1.1, .27);
+    add(new THREE.SphereGeometry(.11, 14, 10), m.snow, 0, .98, .24, [1, .75, .7]);
+    dot(m.coal, .04, 0, 1.01, .32);
+    for (const s of [-1, 1]) stick([0, .95, .31], [s * .05, .93, .31], .008, m.coal);
+    scarf(.8, .24, m.brown); arms(.62, .42, { lift: .18 });
+  } else {
+    // 눈사람 가족: 높은 모자를 쓴 큰 눈사람과 주황 털모자의 꼬마 눈사람이 손을 잡고 있다
+    ball(.4, .38, -.28); ball(.27, 1.0, -.28);
+    for (const s of [-1, 1]) dot(m.coal, .026, -.28 + s * .1, 1.07, .24);
+    const nose = add(new THREE.ConeGeometry(.03, .17, 10), m.carrot, -.28, 1.0, .34); nose.rotation.x = Math.PI / 2;
+    add(new THREE.CylinderGeometry(.27, .27, .015, 24), m.black, -.28, 1.24, 0);
+    add(new THREE.CylinderGeometry(.15, .16, .3, 20), m.black, -.28, 1.4, 0);
+    add(new THREE.CylinderGeometry(.162, .162, .05, 20), m.red, -.28, 1.29, 0);
+    scarf(.8, .22, m.green, 0, -.28);
+    ball(.22, .21, .42); ball(.15, .55, .42);
+    for (const s of [-1, 1]) dot(m.coal, .018, .42 + s * .055, .59, .135);
+    const small = add(new THREE.ConeGeometry(.02, .09, 8), m.carrot, .42, .55, .19); small.rotation.x = Math.PI / 2;
+    add(new THREE.SphereGeometry(.155, 16, 10, 0, Math.PI * 2, 0, Math.PI * .5), m.orange, .42, .6, 0);
+    dot(m.white, .04, .42, .76, 0);
+    stick([.06, .62, .04], [.28, .42, .06]);
+    stick([-.62, .62, 0], [-.88, .86, .05]);
+    stick([.56, .4, 0], [.74, .52, .04], .012);
+  }
+  return g;
+}
+// 겨울 산길: 길을 고르게 나눈 세 자리에 여덟 가지 가운데 세 가지를 세운다
+const snowmen = [];
+function placeSnowmen() {
+  for (const one of snowmen) { scene.remove(one.root); one.root.traverse(o => o.geometry?.dispose()); }
+  snowmen.length = 0;
+  if (!course?.winter || !trail) return;
+  // 오를 때마다 여덟 가지 가운데 세 가지를 새로 뽑는다
+  const rand = mulberry((course.seed ^ Math.floor(Math.random() * 1e9)) >>> 0), order = SNOWMEN.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+  order.length = 3;
+  order.forEach((design, k) => {
+    for (let tries = 0; tries < 12; tries++) {
+      const s = clamp(trail.length * (.2 + k * .28 + (rand() - .5) * .08), 40, trail.length - 40), p = trailAt(s), side = rand() < .5 ? -1 : 1, d = 2.4 + rand() * .5;
+      const x = p.x - p.tz * side * d, z = p.z + p.tx * side * d;
+      if (siteBlocked(x, z) || summitSpot?.clear?.(x, z)) continue;
+      const root = snowmanModel(design);
+      root.position.set(x, groundHeight(x, z) - .03, z);
+      // 등산로 쪽을 보고 선다
+      root.rotation.y = Math.atan2(p.x - x, p.z - z) + (rand() - .5) * .4;
+      scene.add(root);
+      snowmen.push({ root, design, s, x, z, met: false });
+      break;
+    }
+  });
+}
+// 가까이에서 눈사람이 화면에 보이면 한 번 기운 +1
+function checkSnowmen() {
+  for (const one of snowmen) {
+    if (one.met || Math.hypot(one.x - player.x, one.z - player.z) > 11) continue;
+    if (!onScreen(one.x, one.root.position.y + .9, one.z)) continue;
+    one.met = true;
+    gainEnergy(1);
+    showToast(`${SNOWMEN[one.design]}을 만났어요 · 기운 +1`, 3200);
+  }
+}
 function beginHike(stamina) {
   if (pano.on) endPanorama();
   placeEveryone(stamina);
+  placeSnowmen();
+  setupDrift();
   // 체험 코스는 10분이라 산짐승과 신비한 동물이 일찍 나온다
   if (course.trial) Object.assign(wildClock, { small: 20, big: 55, myth: 95 });
   walkTo(null);
@@ -10278,7 +11106,7 @@ function sizeMap(open, focus = true) {
 }
 function showIntro() {
   state.mode = 'intro';
-  try { markClimbed(); } catch {}
+  try { markClimbed(); renderSeason(); } catch {}
   sizeMap(false, false);
   $('loading').hidden = true;
   $('intro').hidden = false;
@@ -10314,13 +11142,18 @@ function leaveIntro() {
 async function enterHike(id) {
   if (!id) return;
   sound.start();
+  // 오늘 날짜의 계절이 아니면 출발할 때 기운 5를 쓴다. 체험 코스는 늘 겨울이다
+  const trial = id === TRIAL.id, want = trial ? 'winter' : pickedSeason, paid = !trial && want !== seasonNow();
+  if (paid && (record.energy ?? 0) < SEASON_COST) { pickedSeason = seasonNow(); renderSeason(); showToast(`다른 계절은 기운 ★${SEASON_COST}가 있어야 고를 수 있어요`); return; }
+  season = want;
   try {
-    if (course?.id !== id) await openCourse(id);
+    if (course?.id !== id || course.season !== want) await openCourse(id);
   } catch (error) {
     console.error(error);
     showLoading('코스를 불러오지 못했습니다. 새로고침한 뒤 다시 골라 주세요.');
     return;
   }
+  if (paid) { spendEnergy(SEASON_COST); renderSeason(); showToast(`기운 ★${SEASON_COST}를 써서 ${SEASONS[want].to} 왔어요`, 3200); }
   player.setLook(look);
   beginHike(START_STAMINA);
 }
@@ -10391,6 +11224,9 @@ async function openCourse(id) {
   if (token !== openToken) return;
   clearWorld();
   course = { ...data, id, seed: data.seed ?? (Number(id.replace(/\D/g, '')) * 7919 || 1), place: data.summit, summit: tidySummit(data.summit, data.name) };
+  course.season = data.trial ? 'winter' : season;
+  course.winter = !!data.winter || course.season === 'winter';
+  kinds = kindsFor(course.season);
   trail = buildTrail(data);
   describeTrail(data);
   drainPerMeter = RULES.courseDrain / (trail.grade.reduce((sum, g) => sum + gradeDrain(g), 0) * trail.ds);
@@ -10413,7 +11249,7 @@ let bookDoc = null, bookTimer = 0;
 const today = () => new Date().toISOString().slice(0, 10);
 // 어느 기기에서 얻은 기록이든 잃지 않도록 합친다
 function mergeRecord(from) {
-  queueMicrotask(() => { try { markClimbed(); } catch {} });
+  queueMicrotask(() => { try { markClimbed(); renderSeason(); } catch {} });
   if (!from) return;
   record.look ??= from.look;
   record.energy = Math.max(record.energy ?? 0, from.energy ?? 0);
@@ -11834,7 +12670,7 @@ async function boot() {
       return { medianMs: +times[n >> 1].toFixed(1), worstMs: +times[n - 1].toFixed(1), pixelRatio: renderer.getPixelRatio(), size: [innerWidth, innerHeight] };
     },
     colliders() { collectColliders(player.x, player.z, 11); return around.slice(); },
-    HD, pano, togglePanorama, groundHeight, game, GAMES, openGame, closeGame, startStudio, startWorldGame, endWorldGame, STONES, summitWords, scenery, sceneView: () => farland?.view, sites: () => trail.sites, amen: () => amen, beginSite: begin, endRest, summitPhoto, stoneSpot: () => stoneSpot, streams: () => trail.streams, spans: () => trail.spans, stonePose: () => ({ x: stoneSpot.x, z: stoneSpot.z, floor: stoneSpot.y, cairn: cairnSpot }), cloudOpacity: () => cloudSea?.material.opacity ?? 0, record, openBook, closeBook, showCertificate, drawCertificate, certInfo, keepCertificate, viewCertificate, replaySummit, portraitOf, saveBook, MYTHS, wild: { bugs, beasts, INSECTS, ANIMALS, Beast, addBug, addBeast, clearWild, step: stepWild, clock: wildClock, unseen },
+    HD, pano, togglePanorama, groundHeight, game, GAMES, openGame, closeGame, startStudio, startWorldGame, endWorldGame, STONES, summitWords, scenery, sceneView: () => farland?.view, sites: () => trail.sites, amen: () => amen, beginSite: begin, endRest, summitPhoto, stoneSpot: () => stoneSpot, streams: () => trail.streams, spans: () => trail.spans, stonePose: () => ({ x: stoneSpot.x, z: stoneSpot.z, floor: stoneSpot.y, cairn: cairnSpot }), cloudOpacity: () => cloudSea?.material.opacity ?? 0, record, openBook, closeBook, snowmanModel, SNOWMEN, snowmen: () => snowmen, drift, frogs, birds: () => birdFlock, seasonBugs, season: () => ({ season, pickedSeason, now: seasonNow(), course: course?.season }), showCertificate, drawCertificate, certInfo, keepCertificate, viewCertificate, replaySummit, portraitOf, saveBook, MYTHS, wild: { bugs, beasts, INSECTS, ANIMALS, Beast, addBug, addBeast, clearWild, step: stepWild, clock: wildClock, unseen },
     openFlora, refreshHud, checkPlaces, updateFlowerTag, flowerTarget: () => flowerNear, flora: FLORA, plantKinds: () => kinds, tilesFlowers: () => [...tiles.values()].flatMap(t => t.flowers),
     stats() {
       let instances = 0, ready = 0;
