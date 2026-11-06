@@ -9338,7 +9338,8 @@ function setupDrift() {
   // 벚꽃잎 두 모양. 가을 잎은 갈래 길이와 각도가 저마다 다른 단풍잎 세 가지와 은행잎, 떡갈잎. 모두 잎자루가 달려 있다
   const petal = (notch) => g => { g.fillStyle = '#fff'; g.beginPath(); g.moveTo(0, 26); g.bezierCurveTo(-30, 4, -20, -26, -4 - notch, -24); g.lineTo(0, -18 + notch); g.lineTo(4 + notch, -24); g.bezierCurveTo(20, -26, 30, 4, 0, 26); g.fill(); };
   const stem = (g, x0, y0, rand, y1 = 31) => {
-    // 잎자루: 잎보다 조금 짙게, 끝이 살짝 휜다
+    // 잎자루: 잎보다 조금 짙게, 끝이 살짝 휜다. 길이는 처음 그린 것의 3할로 짧게
+    y1 = y0 + (y1 - y0) * .3;
     g.strokeStyle = '#9c9c9c';
     g.lineWidth = 2.3;
     g.lineCap = 'round';
@@ -10907,125 +10908,273 @@ function placeEveryone(stamina) {
   focus.copy(player.model.root.position);
 }
 /* ---------- 눈사람: 겨울 산길에 여덟 가지 가운데 세 가지가 서 있다. 보면 기운 +1 ---------- */
-const SNOWMEN = ['당근코 눈사람', '털모자 눈사람', '양동이 눈사람', '갓 쓴 선비 눈사람', '귀마개 눈사람', '등산객 눈사람', '곰 눈사람', '눈사람 가족'];
-let snowmanMats = null;
+const SNOWMEN = ['당근코 눈사람', '초록 털모자 눈사람', '양동이 눈사람', '잭오랜턴 눈사람', '오이코 눈사람', '호박 눈사람', '등산객 눈사람', '눈사람 가족'];
+// 부드러운 3차원 값 잡음: 눈 덩이의 울퉁불퉁함, 호박 골, 찌그러진 양동이에 쓴다
+function vnoise(x, y, z) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), s = t => t * t * (3 - 2 * t), u = s(x - xi), v = s(y - yi), w = s(z - zi), h = (a, b, c) => hash3(xi + a, yi + b, zi + c);
+  return lerp(lerp(lerp(h(0, 0, 0), h(1, 0, 0), u), lerp(h(0, 1, 0), h(1, 1, 0), u), v), lerp(lerp(h(0, 0, 1), h(1, 0, 1), u), lerp(h(0, 1, 1), h(1, 1, 1), u), v), w);
+}
+let snowKit = null;
+function snowmanKit() {
+  return snowKit ??= (() => {
+    const paint = (size, draw, color = true) => {
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      draw(c.getContext('2d'), size);
+      const t = new THREE.CanvasTexture(c);
+      if (color) t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = 4;
+      return t;
+    };
+    // 다져진 눈 알갱이
+    const grain = paint(256, (g, s) => { const img = g.createImageData(s, s); for (let i = 0; i < s * s; i++) { const v = 170 + Math.random() * 85; img.data.set([v, v, v, 255], i * 4); } g.putImageData(img, 0, 0); }, false);
+    // 뜨개: V자 코가 줄지어 이어지고, 코마다 털실 결이 보인다
+    const knit = (base, dark, light) => paint(128, (g, s) => {
+      g.fillStyle = dark; g.fillRect(0, 0, s, s);
+      const cols = 8, rows = 8, w = s / cols, h = s / rows;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) for (const side of [-1, 1]) {
+        const x = c * w + w / 2 + side * w * .2, y = r * h + h / 2;
+        g.save(); g.translate(x, y); g.rotate(side * .55);
+        const k = g.createLinearGradient(0, -h * .6, 0, h * .6); k.addColorStop(0, light); k.addColorStop(.5, base); k.addColorStop(1, dark);
+        g.fillStyle = k; g.beginPath(); g.ellipse(0, 0, w * .24, h * .62, 0, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = .8; for (let k2 = -2; k2 <= 2; k2++) { g.beginPath(); g.moveTo(-w * .18, k2 * h * .2); g.lineTo(w * .18, k2 * h * .2 + 1.5); g.stroke(); }
+        g.restore();
+      }
+    });
+    // 고무단: 세로 골
+    const rib = (base, dark) => paint(64, (g, s) => { for (let x = 0; x < s; x++) { const v = Math.sin(x / s * Math.PI * 8) * .5 + .5; g.fillStyle = v > .5 ? base : dark; g.fillRect(x, 0, 1, s); } });
+    const std = (o) => new THREE.MeshStandardMaterial({ roughness: .85, metalness: 0, ...o });
+    const redKnit = knit('#c9302a', '#7c1814', '#ea5a4c'), greenKnit = knit('#2e8a48', '#17532a', '#57b46e'), orangeKnit = knit('#e8842a', '#9a4a12', '#f6a95a'), creamKnit = knit('#efe6d2', '#b9ab8e', '#ffffff'), blueKnit = knit('#3a6fc4', '#1f3f7a', '#6a9ae0');
+    return {
+      snow: std({ color: '#f4f7fb', roughness: .96, bumpMap: grain, bumpScale: 1.1, vertexColors: true }),
+      coal: std({ color: '#1c1b1e', roughness: .62 }), carrot: std({ vertexColors: true, roughness: .55 }), wood: std({ vertexColors: true, roughness: .9 }),
+      metal: std({ color: '#c3cad1', metalness: .12, roughness: .36 }), metalDark: std({ color: '#8f989f', metalness: .12, roughness: .4 }),
+      straw: std({ vertexColors: true, roughness: .9 }), twine: std({ color: '#8a2f22', roughness: .9 }), felt: std({ color: '#1d1b20', roughness: .78 }), ribbon: std({ color: '#b8262b', roughness: .5 }),
+      pumpkin: std({ vertexColors: true, roughness: .55 }), stem: std({ color: '#6a5a2c', roughness: .9 }), cuke: std({ vertexColors: true, roughness: .5 }), wart: std({ color: '#d8e8b0', roughness: .6 }),
+      yellow: std({ color: '#f1c22e', roughness: .6 }), orange: std({ color: '#ec8a2a', roughness: .7 }), strap: std({ color: '#3b2f26', roughness: .8 }), pole: std({ color: '#8b949c', metalness: .4, roughness: .35 }), black: std({ color: '#18171a', roughness: .6 }),
+      redKnit: std({ map: redKnit, bumpMap: redKnit, bumpScale: 1.4 }), greenKnit: std({ map: greenKnit, bumpMap: greenKnit, bumpScale: 1.4 }), orangeKnit: std({ map: orangeKnit, bumpMap: orangeKnit, bumpScale: 1.4 }),
+      creamKnit: std({ map: creamKnit, bumpMap: creamKnit, bumpScale: 1.4 }), blueKnit: std({ map: blueKnit, bumpMap: blueKnit, bumpScale: 1.4 }),
+      greenRib: std({ map: rib('#2e8a48', '#1d6334') }), redRib: std({ map: rib('#c9302a', '#8a1f1a') }), creamRib: std({ map: rib('#efe6d2', '#c9bc9e') }),
+      knitMaps: { redKnit, greenKnit, orangeKnit, creamKnit, blueKnit },
+    };
+  })();
+}
 function snowmanModel(design) {
-  const m = snowmanMats ??= {
-    snow: new THREE.MeshLambertMaterial({ color: '#f3f6fa' }), coal: new THREE.MeshLambertMaterial({ color: '#1e1d1f' }), carrot: new THREE.MeshLambertMaterial({ color: '#ef7a22' }),
-    wood: new THREE.MeshLambertMaterial({ color: '#6b4a2e' }), red: new THREE.MeshLambertMaterial({ color: '#d23a2e' }), green: new THREE.MeshLambertMaterial({ color: '#2f7a46' }),
-    blue: new THREE.MeshLambertMaterial({ color: '#3a6fc4' }), pink: new THREE.MeshLambertMaterial({ color: '#f08fb4' }), cheek: new THREE.MeshLambertMaterial({ color: '#f4b2c2' }),
-    white: new THREE.MeshLambertMaterial({ color: '#ffffff' }), tin: new THREE.MeshLambertMaterial({ color: '#9aa3ab' }), black: new THREE.MeshLambertMaterial({ color: '#17161a' }),
-    yellow: new THREE.MeshLambertMaterial({ color: '#f1c22e' }), orange: new THREE.MeshLambertMaterial({ color: '#ec8a2a' }), brown: new THREE.MeshLambertMaterial({ color: '#7a5233' }),
-    pine: new THREE.MeshLambertMaterial({ color: '#2f6a3c' }), straw: new THREE.MeshLambertMaterial({ color: '#d9b45a' }), gat: new THREE.MeshLambertMaterial({ color: '#141317', transparent: true, opacity: .88 }),
+  const m = snowmanKit(), g = new THREE.Group(), up = new THREE.Vector3(0, 1, 0), seed = design * 7.31;
+  const add = (geo, mat, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
+  const colors = (geo, paint) => { const p = geo.attributes.position, c = []; const col = new THREE.Color(); for (let i = 0; i < p.count; i++) { paint(col, p.getX(i), p.getY(i), p.getZ(i), i); c.push(col.r, col.g, col.b); } geo.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); return geo; };
+  // 눈 덩이: 굴려 만든 듯 울퉁불퉁하고, 아래는 무게에 눌려 평평하다. 오목한 곳은 푸르스름하게 그늘진다
+  const ball = (r, y, x = 0, z = 0, squash = .92) => {
+    const geo = new THREE.SphereGeometry(r, 64, 44), p = geo.attributes.position, dent = [];
+    for (let i = 0; i < p.count; i++) {
+      const px = p.getX(i), py = p.getY(i), pz = p.getZ(i), k = 3.2 / r * .3;
+      const n = (vnoise(px * k + seed, py * k, pz * k) - .5) * .1 + (vnoise(px * k * 4.5, py * k * 4.5 + seed, pz * k * 4.5) - .5) * .035;
+      let ny = py * squash * (1 + n);
+      if (ny < -r * .82) ny = -r * .82 + (ny + r * .82) * .15;
+      p.setXYZ(i, px * (1 + n), ny, pz * (1 + n));
+      dent.push(n);
+    }
+    geo.computeVertexNormals();
+    colors(geo, (col, px, py, pz, i) => { const v = .9 + dent[i] * 1.4 + py / r * .04; col.setRGB(v * .97, v * .985, v); });
+    return add(geo, m.snow, x, y, z);
   };
-  const g = new THREE.Group(), up = new THREE.Vector3(0, 1, 0);
-  const add = (geo, mat, x, y, z, scale = null) => {
-    const o = new THREE.Mesh(geo, mat);
-    o.position.set(x, y, z);
-    if (scale) o.scale.set(...scale);
-    o.castShadow = true;
-    g.add(o);
-    return o;
+  // 숯 조각: 모난 덩어리를 제각각 돌려 박는다
+  const coal = (r, x, y, z) => { const o = add(new THREE.DodecahedronGeometry(r, 0), m.coal, x, y, z); o.rotation.set(hash3(x * 50, y * 50, z) * 6, hash3(y * 40, z * 40, x) * 6, 0); o.scale.set(1, .8 + hash3(x, y, z * 9) * .3, .7); return o; };
+  // 당근 코: 끝으로 갈수록 가늘고, 가로 주름이 있다
+  const carrot = (x, y, z, len = .21, r = .034, turn = 0) => {
+    const pts = []; for (let i = 0; i <= 16; i++) { const t = i / 16; pts.push(new THREE.Vector2(Math.max(.0015, r * Math.pow(1 - t, .85) * (1 + Math.sin(t * 46) * .05)), t * len)); }
+    const geo = new THREE.LatheGeometry(pts, 18);
+    colors(geo, (col, px, py) => { col.set('#ee7a20'); if (Math.sin(py / len * 46) > .6) col.lerp(new THREE.Color('#c45a12'), .5); });
+    const o = add(geo, m.carrot, x, y, z); o.rotation.set(Math.PI / 2, 0, turn); return o;
   };
-  const ball = (r, y, x = 0, z = 0, squash = .93) => add(new THREE.SphereGeometry(r, 22, 16), m.snow, x, y, z, [1, squash, 1]);
-  const dot = (mat, r, x, y, z) => add(new THREE.SphereGeometry(r, 10, 8), mat, x, y, z);
-  const stick = (from, to, r = .017, mat = m.wood) => {
-    const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to), o = add(new THREE.CylinderGeometry(r * .65, r, a.distanceTo(b), 7), mat, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
-    o.quaternion.setFromUnitVectors(up, b.clone().sub(a).normalize());
-    return o;
+  // 나뭇가지 팔: 굽은 가지에 잔가지가 두세 개 갈라진다
+  const twig = (from, to, r = .016, forks = 2) => {
+    const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to), mid = a.clone().lerp(b, .5).add(new THREE.Vector3(0, .04, .02));
+    const curve = new THREE.CatmullRomCurve3([a, mid, b]), geo = new THREE.TubeGeometry(curve, 14, r, 7);
+    colors(geo, col => col.set('#5d3f26').multiplyScalar(.85 + Math.random() * .3));
+    add(geo, m.wood);
+    for (let k = 0; k < forks; k++) {
+      const t = .55 + k * .2, at = curve.getPoint(t), dir = b.clone().sub(a).normalize(), side = new THREE.Vector3(-dir.y, dir.x, 0).multiplyScalar(k % 2 ? -1 : 1);
+      const tip = at.clone().addScaledVector(dir, .08).addScaledVector(side, .07 + k * .02).add(new THREE.Vector3(0, .03, 0));
+      const sub = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([at, at.clone().lerp(tip, .5).add(new THREE.Vector3(0, .01, 0)), tip]), 6, r * .5, 5);
+      colors(sub, col => col.set('#5d3f26'));
+      add(sub, m.wood);
+    }
+    return b;
   };
-  // 얼굴: 숯 눈, 당근 코, 숯 조각 웃음
-  const face = (hy, hr, { nose = .19, smile = 5, eyes = .028 } = {}) => {
-    for (const s of [-1, 1]) dot(m.coal, eyes, s * hr * .36, hy + hr * .24, hr * .9);
-    if (nose) { const o = add(new THREE.ConeGeometry(.032, nose, 10), m.carrot, 0, hy + hr * .02, hr * .94 + nose / 2); o.rotation.x = Math.PI / 2; }
-    for (let k = 0; k < smile; k++) { const a = (k / (smile - 1) - .5) * 1.5; dot(m.coal, .016, Math.sin(a) * hr * .46, hy - hr * .34 + (1 - Math.cos(a)) * hr * .24, Math.cos(a * .6) * hr * .86); }
-  };
-  // 나뭇가지 팔: 어깨에서 비스듬히 뻗고 끝에 잔가지가 갈라진다
-  const arms = (y, r, { lift = .3, mitten = null, reach = .46 } = {}) => {
-    for (const s of [-1, 1]) {
-      const from = [s * r * .82, y, 0], to = [s * (r + reach), y + lift, .06];
-      stick(from, to);
-      stick(to, [to[0] + s * .1, to[1] + .1, to[2] + .02], .009);
-      stick(to, [to[0] + s * .12, to[1] - .02, to[2] - .02], .009);
-      if (mitten) dot(mitten, .05, ...to);
+  // 털목도리: 목을 감은 고리와 늘어진 두 자락, 끝에 술
+  const scarf = (y, r, mat, x = 0) => {
+    const ring = add(new THREE.TorusGeometry(r, .05, 14, 48), mat, x, y, 0); ring.rotation.x = Math.PI / 2; ring.scale.set(1, 1, .9);
+    for (const [dx, len, tilt] of [[.08, .3, .14], [.17, .24, .32]]) {
+      const tail = add(new THREE.BoxGeometry(.11, len, .03, 2, 8, 1), mat, x + dx, y - len / 2 - .02, r * .86);
+      const tp = tail.geometry.attributes.position; for (let i = 0; i < tp.count; i++) tp.setZ(i, tp.getZ(i) + Math.pow((len / 2 - tp.getY(i)) / len, 2) * .06);
+      tail.geometry.computeVertexNormals(); tail.rotation.z = tilt;
+      for (let k = 0; k < 6; k++) { const fx = -.045 + k * .018; const f = add(new THREE.CylinderGeometry(.004, .003, .05, 5), mat, 0, 0, 0); f.position.set(x + dx + fx * Math.cos(tilt) + Math.sin(tilt) * (len / 2 + .025), y - len - .045 - fx * Math.sin(tilt) * .3, r * .86 + .045); f.rotation.z = tilt; }
     }
   };
-  const scarf = (y, r, mat, tail = 1, x = 0) => {
-    const ring = add(new THREE.TorusGeometry(r, .045, 8, 24), mat, x, y, 0);
-    ring.rotation.x = Math.PI / 2;
-    if (tail) { const o = add(new THREE.BoxGeometry(.1, .28, .035), mat, x + r * .55 * tail, y - .14, r * .8); o.rotation.z = .18 * tail; }
+  // 털모자: 뜨개 몸통, 접어 올린 고무단, 털 방울
+  const beanie = (hy, hr, knitMat, ribMat, pomMat, x = 0) => {
+    add(new THREE.SphereGeometry(hr * .99, 48, 24, 0, Math.PI * 2, 0, Math.PI * .5), knitMat, x, hy + hr * .6, 0).scale.set(1, 1.15, 1);
+    add(new THREE.CylinderGeometry(hr * .99, hr * .94, hr * .32, 48, 1, true), ribMat, x, hy + hr * .6, 0);
+    const pom = new THREE.IcosahedronGeometry(hr * .3, 4), pp = pom.attributes.position;
+    for (let i = 0; i < pp.count; i++) { const v = new THREE.Vector3(pp.getX(i), pp.getY(i), pp.getZ(i)), k = 1 + (vnoise(v.x * 60, v.y * 60, v.z * 60) - .5) * .5; pp.setXYZ(i, v.x * k, v.y * k, v.z * k); }
+    pom.computeVertexNormals();
+    add(pom, pomMat, x, hy + hr * 1.72, 0);
   };
-  const buttons = (y0, step, r, n = 3) => { for (let k = 0; k < n; k++) dot(m.coal, .026, 0, y0 - k * step, Math.sqrt(Math.max(0, r * r - (k * step) ** 2)) * .97); };
-  const beanie = (hy, hr, mat, pom = m.white) => {
-    add(new THREE.SphereGeometry(hr * .98, 20, 12, 0, Math.PI * 2, 0, Math.PI * .5), mat, 0, hy + hr * .46, 0);
-    const rim = add(new THREE.TorusGeometry(hr * .9, .038, 8, 24), pom, 0, hy + hr * .48, 0);
-    rim.rotation.x = Math.PI / 2;
-    dot(pom, .07, 0, hy + hr * 1.46, 0);
+  const mitten = (mat, x, y, z) => { add(new THREE.SphereGeometry(.05, 20, 14), mat, x, y, z).scale.set(1, 1.3, .8); add(new THREE.SphereGeometry(.022, 12, 10), mat, x + Math.sign(x) * -.035, y + .02, z + .02).scale.set(1, 1.4, 1); add(new THREE.CylinderGeometry(.048, .052, .05, 18), mat, x, y - .065, z); };
+  const front = (r, x, dy) => Math.sqrt(Math.max(0, r * r - x * x - (dy / .92) ** 2)) * 1.02;
+  const face = (hy, hr, { nose = 'carrot', smile = 7 } = {}) => {
+    for (const s of [-1, 1]) coal(.024, s * hr * .35, hy + hr * .24, front(hr, hr * .35, hr * .24));
+    if (nose === 'carrot') carrot(0, hy + hr * .02, hr * .9);
+    for (let k = 0; k < smile; k++) { const a = (k / (smile - 1) - .5) * 1.7, x = Math.sin(a) * hr * .46, dy = -hr * .34 + (1 - Math.cos(a)) * hr * .24; coal(.015, x, hy + dy, front(hr, x, dy)); }
   };
+  // 단추: cy는 몸통 덩이의 가운데 높이
+  const buttons = (y0, step, r, cy, n = 3) => { for (let k = 0; k < n; k++) { const y = y0 - k * step; coal(.03, 0, y, front(r, 0, y - cy) + .005); } };
+  // 발밑 눈 무더기
+  const mound = (r, x = 0) => { const o = ball(r, 0, x, 0, .2); o.scale.set(1.25, 1, 1.25); };
+  // 양동이: 테두리가 말린 함석 통, 골 두 줄, 철사 손잡이. 조금 찌그러져 있다
+  const bucket = (y, x = 0, tilt = -.18) => {
+    const pts = [new THREE.Vector2(.0, .27), new THREE.Vector2(.16, .27), new THREE.Vector2(.165, .2), new THREE.Vector2(.18, .1), new THREE.Vector2(.2, .012), new THREE.Vector2(.214, 0), new THREE.Vector2(.212, -.012), new THREE.Vector2(.198, -.004)];
+    const geo = new THREE.LatheGeometry(pts, 40), p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const v = new THREE.Vector3(p.getX(i), p.getY(i), p.getZ(i)), k = 1 + (vnoise(v.x * 9, v.y * 9, v.z * 9) - .5) * .06; p.setXYZ(i, v.x * k, v.y, v.z * k); }
+    geo.computeVertexNormals();
+    const pail = new THREE.Group(); pail.position.set(x, y, 0); pail.rotation.z = tilt; g.add(pail);
+    const body = new THREE.Mesh(geo, m.metal); body.castShadow = true; pail.add(body);
+    for (const [hy, hr] of [[.08, .186], [.18, .172]]) { const band = new THREE.Mesh(new THREE.TorusGeometry(hr, .006, 6, 40), m.metalDark); band.position.y = hy; band.rotation.x = Math.PI / 2; pail.add(band); }
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(.19, .005, 6, 30, Math.PI), m.metalDark); handle.position.y = .03; handle.rotation.set(0, Math.PI / 2, Math.PI); handle.rotation.order = 'YXZ'; pail.add(handle);
+    for (const s of [-1, 1]) { const ear = new THREE.Mesh(new THREE.CylinderGeometry(.012, .012, .01, 10), m.metalDark); ear.position.set(0, .04, s * .195); ear.rotation.x = Math.PI / 2; pail.add(ear); }
+  };
+  // 빗자루: 나무 자루, 붉은 끈 세 줄, 펼쳐진 수수 이삭
+  const broom = (base, top) => {
+    const a = new THREE.Vector3(...base), b = new THREE.Vector3(...top), dir = b.clone().sub(a).normalize(), len = a.distanceTo(b);
+    const handle = add(new THREE.CylinderGeometry(.016, .018, len, 12), m.wood, ...a.clone().lerp(b, .5).toArray());
+    colors(handle.geometry, (col, px, py) => col.set('#8a5a32').multiplyScalar(.85 + Math.sin(py * 60) * .08));
+    handle.quaternion.setFromUnitVectors(up, dir);
+    const head = a.clone().addScaledVector(dir, -.02);
+    for (let k = 0; k < 3; k++) { const ring = add(new THREE.TorusGeometry(.03 + k * .006, .006, 6, 18), m.twine, ...head.clone().addScaledVector(dir, -k * .035).toArray()); ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir); }
+    for (let k = 0; k < 64; k++) {
+      const spread = (k / 63 - .5) * .9, l = .3 + hash3(k, 3, 7) * .06, from = head.clone().addScaledVector(dir, -.08);
+      const side = new THREE.Vector3(1, 0, 0).applyAxisAngle(up, (hash3(k, 1, 1) - .5) * .5), to = from.clone().addScaledVector(dir, -l).addScaledVector(side, spread * .22).add(new THREE.Vector3(0, 0, (hash3(k, 5, 2) - .5) * .06));
+      const geo = new THREE.CylinderGeometry(.0028, .0042, from.distanceTo(to), 4);
+      colors(geo, col => col.set(hash3(k, 9, 9) > .5 ? '#d8b25a' : '#c49a43'));
+      const s = add(geo, m.straw, ...from.clone().lerp(to, .5).toArray()); s.quaternion.setFromUnitVectors(up, to.clone().sub(from).normalize());
+    }
+  };
+  // 호박: 세로 골이 깊고 납작하다. 꼭지는 굽은 줄기. carve가 있으면 잭오랜턴으로 깎아 안에서 빛난다
+  const pumpkin = (r, x, y, z, { carve = false, ribs = 10, squash = .78, turn = 0 } = {}) => {
+    const geo = new THREE.SphereGeometry(r, 64, 40), p = geo.attributes.position, groove = [];
+    for (let i = 0; i < p.count; i++) {
+      const px = p.getX(i), py = p.getY(i), pz = p.getZ(i), a = Math.atan2(pz, px), gq = Math.pow(Math.abs(Math.cos(a * ribs / 2)), .6), k = .9 + .1 * gq + (vnoise(px * 8, py * 8, pz * 8) - .5) * .03;
+      p.setXYZ(i, px * k, py * squash * (1 - .12 * (1 - Math.abs(py) / r) * 0) * (.94 + .06 * gq), pz * k);
+      groove.push(gq);
+    }
+    geo.computeVertexNormals();
+    colors(geo, (col, px, py, pz, i) => { col.set('#e9781d').lerp(new THREE.Color('#9a3e0a'), (1 - groove[i]) * .55); col.lerp(new THREE.Color('#f7a24a'), Math.max(0, py / r) * .15); });
+    let mat = m.pumpkin;
+    if (carve) {
+      // 앞쪽(구의 u=0.25)에 세모 눈 둘, 세모 코, 톱니 입을 깎아 촛불 빛이 새어 나온다
+      const c = document.createElement('canvas'); c.width = 512; c.height = 256; const q = c.getContext('2d');
+      q.fillStyle = '#000'; q.fillRect(0, 0, 512, 256); q.fillStyle = '#ffd36a';
+      const cx = 128, cy = 128;
+      q.beginPath(); q.moveTo(cx - 44, cy - 14); q.lineTo(cx - 18, cy - 14); q.lineTo(cx - 31, cy - 46); q.fill();
+      q.beginPath(); q.moveTo(cx + 18, cy - 14); q.lineTo(cx + 44, cy - 14); q.lineTo(cx + 31, cy - 46); q.fill();
+      q.beginPath(); q.moveTo(cx - 8, cy + 4); q.lineTo(cx + 8, cy + 4); q.lineTo(cx, cy - 10); q.fill();
+      q.beginPath(); q.moveTo(cx - 52, cy + 18); for (let k = 0; k <= 8; k++) q.lineTo(cx - 52 + k * 13, cy + 18 + (k % 2 ? 12 : 0)); q.lineTo(cx + 52, cy + 18); q.quadraticCurveTo(cx, cy + 74, cx - 52, cy + 18); q.fill();
+      const glow = new THREE.CanvasTexture(c); glow.colorSpace = THREE.SRGBColorSpace;
+      mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .55, emissive: '#ffb340', emissiveMap: glow, emissiveIntensity: 1.6 });
+    }
+    const o = add(geo, mat, x, y, z); o.rotation.y = turn;
+    const stem = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0, r * squash * .86, 0), new THREE.Vector3(.01, r * squash * .86 + .05, 0), new THREE.Vector3(.04, r * squash * .86 + .085, .01)]), 8, r * .09, 8);
+    add(stem, m.stem, x, y, z).rotation.y = turn;
+    return o;
+  };
+  // 오이: 길쭉하고 살짝 휘었으며, 옅은 세로 줄과 오돌토돌한 돌기가 있다
+  const cucumber = (x, y, z, len = .2, r = .028, rot = [Math.PI / 2, 0, 0]) => {
+    const pts = []; for (let i = 0; i <= 18; i++) { const t = i / 18, k = t < .1 ? Math.sin(t / .1 * Math.PI / 2) : t > .88 ? Math.cos((t - .88) / .12 * Math.PI / 2) * .9 + .1 : 1; pts.push(new THREE.Vector2(Math.max(.002, r * k), t * len)); }
+    const geo = new THREE.LatheGeometry(pts, 20), p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const t = p.getY(i) / len; p.setX(i, p.getX(i) + Math.sin(t * Math.PI) * .012); }
+    geo.computeVertexNormals();
+    colors(geo, (col, px, py, pz) => { col.set('#2f6f24'); if (Math.sin(Math.atan2(pz, px) * 6) > .45) col.lerp(new THREE.Color('#79ad4a'), .45); if (py / len > .9) col.lerp(new THREE.Color('#c9b24a'), .4); });
+    const wrap = new THREE.Group(); wrap.position.set(x, y, z); wrap.rotation.set(...rot); g.add(wrap);
+    const body = new THREE.Mesh(geo, m.cuke); body.castShadow = true; wrap.add(body);
+    for (let k = 0; k < 16; k++) { const t = .12 + hash3(k, 2, design) * .74, a = hash3(k, 4, design) * 6.283, w = new THREE.Mesh(new THREE.SphereGeometry(.0045, 6, 4), m.wart); w.position.set(Math.cos(a) * r * .97 + Math.sin(t * Math.PI) * .012, t * len, Math.sin(a) * r * .97); wrap.add(w); }
+    return wrap;
+  };
+
   if (design === 0) {
-    // 당근코 눈사람: 둥근 두 덩이, 빨간 목도리
-    ball(.4, .38); ball(.27, 1.0); face(1.0, .27); arms(.62, .4); scarf(.8, .22, m.red);
+    // 당근코 눈사람: 둥근 두 덩이에 빨간 털목도리, 숯 눈·웃음·단추, 나뭇가지 팔
+    mound(.42); ball(.42, .38); ball(.28, 1.0); face(1.0, .28); scarf(.79, .23, m.redKnit); buttons(.6, .13, .42, .38);
+    twig([-.34, .62, 0], [-.82, .9, .08]); twig([.34, .62, 0], [.8, .8, .1]);
   } else if (design === 1) {
-    // 털모자 눈사람: 세 덩이에 방울 달린 빨간 털모자와 벙어리장갑
-    ball(.38, .36); ball(.28, .9); ball(.2, 1.32); face(1.32, .2, { nose: .15 }); beanie(1.32, .2, m.red); scarf(1.14, .16, m.green); buttons(1.02, .11, .28); arms(.96, .28, { mitten: m.red, lift: .22 });
+    // 초록 털모자 눈사람: 세 덩이, 방울 달린 초록 털모자, 빨간 털목도리, 털장갑
+    mound(.4); ball(.4, .37); ball(.29, .92); ball(.21, 1.35); face(1.35, .21, { smile: 6 }); carrot(0, 1.35, .19, .16, .028);
+    beanie(1.35, .21, m.greenKnit, m.greenRib, m.creamKnit); scarf(1.16, .17, m.redKnit); buttons(1.03, .11, .29, .92);
+    const l = twig([-.25, 1.0, 0], [-.6, 1.2, .1], .016, 1), r = twig([.25, 1.0, 0], [.6, .86, .12], .016, 1);
+    mitten(m.greenKnit, l.x, l.y, l.z); mitten(m.greenKnit, r.x, r.y, r.z);
   } else if (design === 2) {
-    // 양동이 눈사람: 비스듬히 쓴 양동이, 솔가지 팔, 기대 세운 빗자루
-    ball(.42, .4); ball(.28, 1.03); face(1.03, .28);
-    const pail = add(new THREE.CylinderGeometry(.17, .21, .24, 18, 1, true), m.tin, .03, 1.36, 0); pail.rotation.z = -.18;
-    const lid = add(new THREE.CircleGeometry(.17, 18), m.tin, .05, 1.48, 0); lid.rotation.set(-Math.PI / 2, 0, -.18);
-    for (const s of [-1, 1]) { const from = [s * .34, .68, 0], to = [s * .82, .98, .06]; stick(from, to); for (let k = 0; k < 4; k++) { const t = .45 + k * .16; dot(m.pine, .055, lerp(from[0], to[0], t), lerp(from[1], to[1], t) + .03, .06); } }
-    stick([.6, 0, .32], [.5, 1.05, .25], .02);
-    const broom = add(new THREE.ConeGeometry(.12, .32, 12), m.straw, .61, .14, .32); broom.rotation.z = .08;
+    // 양동이 눈사람: 비스듬히 쓴 양동이, 손에 쥔 빗자루
+    mound(.44); ball(.44, .41); ball(.29, 1.05); face(1.05, .29); bucket(1.23, .03); scarf(.84, .23, m.blueKnit); buttons(.64, .14, .44, .41);
+    twig([-.36, .66, 0], [-.84, .96, .06]);
+    const hand = twig([.36, .66, 0], [.66, .74, .22], .016, 1);
+    broom([hand.x + .06, .42, hand.z + .1], [hand.x - .05, 1.36, hand.z]);
   } else if (design === 3) {
-    // 갓 쓴 선비 눈사람: 검은 갓, 잔가지 콧수염, 흰 수염
-    ball(.42, .4); ball(.28, 1.03); face(1.03, .28, { nose: .1, smile: 0 });
-    const brim = add(new THREE.CylinderGeometry(.42, .42, .012, 32), m.gat, 0, 1.25, 0);
-    add(new THREE.CylinderGeometry(.11, .13, .2, 20), m.gat, 0, 1.36, 0);
-    brim.renderOrder = 1;
-    for (const s of [-1, 1]) { stick([0, 1.0, .29], [s * .16, .96, .25], .012, m.brown); stick([s * .27, 1.24, 0], [s * .18, .84, .12], .004, m.black); }
-    const beard = add(new THREE.ConeGeometry(.09, .28, 14), m.white, 0, .82, .24); beard.rotation.x = Math.PI;
-    buttons(.62, .14, .42, 2); arms(.66, .42, { lift: .1 });
+    // 잭오랜턴 눈사람: 머리 위에 빛나는 잭오랜턴을 쓰고, 주황 털목도리
+    mound(.42); ball(.42, .39); ball(.28, 1.0); face(1.0, .28, { smile: 0 }); carrot(0, .98, .26, .14, .026);
+    pumpkin(.24, 0, 1.39, 0, { carve: true, ribs: 9 }); scarf(.8, .22, m.orangeKnit); buttons(.6, .13, .42, .39);
+    twig([-.34, .62, 0], [-.8, .92, .08]); twig([.34, .62, 0], [.8, .9, .08]);
+    pumpkin(.12, .42, .1, .36, { ribs: 8 }); pumpkin(.08, .58, .07, .2, { ribs: 7, turn: 1 });
   } else if (design === 4) {
-    // 귀마개 눈사람: 통통한 몸, 분홍 귀마개와 발그레한 볼
-    ball(.44, .41, 0, 0, .9); ball(.31, 1.05, 0, 0, .9); face(1.05, .31, { nose: .12 });
-    const band = add(new THREE.TorusGeometry(.32, .025, 8, 24, Math.PI), m.pink, 0, 1.08, 0); band.rotation.y = Math.PI / 2;
-    for (const s of [-1, 1]) { dot(m.pink, .085, s * .31, 1.08, 0); add(new THREE.SphereGeometry(.05, 10, 8), m.cheek, s * .19, .98, .25, [1, .6, .4]); }
-    scarf(.8, .26, m.blue); arms(.66, .44, { lift: .34, mitten: m.blue });
+    // 오이코 눈사람: 오이 코, 손에 든 오이 한 개, 초록 털목도리
+    mound(.42); ball(.42, .39); ball(.29, 1.02); face(1.02, .29, { nose: null });
+    cucumber(0, 1.02, .24, .19, .03); scarf(.81, .23, m.greenKnit); buttons(.62, .13, .42, .39);
+    twig([-.34, .64, 0], [-.8, .9, .08]);
+    const hand = twig([.34, .64, 0], [.72, .8, .18], .016, 1);
+    cucumber(hand.x - .02, hand.y - .04, hand.z + .02, .2, .028, [0, 0, -.5]);
   } else if (design === 5) {
-    // 등산객 눈사람: 노란 모자, 주황 배낭, 등산 스틱 두 개
-    ball(.41, .39); ball(.28, 1.01); face(1.01, .28);
-    add(new THREE.SphereGeometry(.27, 20, 12, 0, Math.PI * 2, 0, Math.PI * .5), m.yellow, 0, 1.14, 0);
-    const peak = add(new THREE.CylinderGeometry(.17, .17, .025, 20, 1, false, -Math.PI / 2, Math.PI), m.yellow, 0, 1.15, .19); peak.scale.z = 1.2;
-    add(new THREE.BoxGeometry(.4, .44, .2), m.orange, 0, .52, -.42);
-    stick([-.2, .78, -.28], [-.14, .3, -.4], .02, m.black); stick([.2, .78, -.28], [.14, .3, -.4], .02, m.black);
-    scarf(.82, .23, m.red);
-    for (const s of [-1, 1]) { stick([s * .36, .62, 0], [s * .62, .55, .2]); stick([s * .62, 0, .28], [s * .62, 1.0, .2], .012, m.tin); dot(m.black, .03, s * .62, 1.0, .2); }
+    // 호박 눈사람: 늙은호박을 두 팔로 안고 있고, 발밑에도 작은 호박이 놓여 있다
+    mound(.46); ball(.44, .41); ball(.29, 1.04); face(1.04, .29); scarf(.83, .23, m.creamKnit);
+    beanie(1.04, .29, m.orangeKnit, m.creamRib, m.orangeKnit);
+    pumpkin(.2, 0, .62, .42, { ribs: 10 });
+    twig([-.36, .72, .05], [-.16, .62, .5], .016, 1); twig([.36, .72, .05], [.16, .62, .5], .016, 1);
+    pumpkin(.11, -.44, .08, .32, { ribs: 8 }); pumpkin(.09, .46, .07, .34, { ribs: 7, turn: 2 });
   } else if (design === 6) {
-    // 곰 눈사람: 동그란 귀, 까만 코, 갈색 목도리
-    ball(.42, .4); ball(.3, 1.04);
-    for (const s of [-1, 1]) { ball(.1, 1.3, s * .2, 0, 1); add(new THREE.SphereGeometry(.055, 10, 8), m.brown, s * .2, 1.31, .06, [1, 1, .5]); }
-    for (const s of [-1, 1]) dot(m.coal, .03, s * .11, 1.1, .27);
-    add(new THREE.SphereGeometry(.11, 14, 10), m.snow, 0, .98, .24, [1, .75, .7]);
-    dot(m.coal, .04, 0, 1.01, .32);
-    for (const s of [-1, 1]) stick([0, .95, .31], [s * .05, .93, .31], .008, m.coal);
-    scarf(.8, .24, m.brown); arms(.62, .42, { lift: .18 });
+    // 등산객 눈사람: 노란 모자, 배낭, 양손에 등산 스틱, 빨간 털목도리
+    mound(.42); ball(.41, .39); ball(.28, 1.01); face(1.01, .28);
+    add(new THREE.SphereGeometry(.275, 40, 20, 0, Math.PI * 2, 0, Math.PI * .5), m.yellow, 0, 1.13, 0);
+    const peak = add(new THREE.CylinderGeometry(.18, .18, .02, 32, 1, false, -Math.PI / 2, Math.PI), m.yellow, 0, 1.14, .18); peak.scale.z = 1.25;
+    const pack = add(new THREE.BoxGeometry(.4, .46, .2, 6, 6, 3), m.orange, 0, .56, -.42); const bp = pack.geometry.attributes.position;
+    for (let i = 0; i < bp.count; i++) { const v = new THREE.Vector3(bp.getX(i), bp.getY(i), bp.getZ(i)), k = 1 - .1 * (Math.abs(v.x) / .2) * (Math.abs(v.y) / .23); bp.setXYZ(i, v.x * k, v.y, v.z * (1 - .12 * Math.abs(v.y) / .23)); }
+    pack.geometry.computeVertexNormals();
+    add(new THREE.BoxGeometry(.26, .16, .06), m.orange, 0, .48, -.53); add(new THREE.BoxGeometry(.42, .08, .22), m.strap, 0, .8, -.42);
+    for (const s of [-1, 1]) { const st = add(new THREE.BoxGeometry(.05, .5, .02), m.strap, s * .14, .7, -.22); st.rotation.x = -.5; }
+    scarf(.82, .23, m.redKnit);
+    for (const s of [-1, 1]) {
+      const hand = twig([s * .36, .62, 0], [s * .62, .58, .22], .016, 1);
+      add(new THREE.CylinderGeometry(.009, .009, 1.05, 10), m.pole, hand.x, .52, hand.z + .02);
+      add(new THREE.CylinderGeometry(.017, .017, .12, 12), m.black, hand.x, .99, hand.z + .02);
+      add(new THREE.CylinderGeometry(.05, .05, .008, 16), m.black, hand.x, .08, hand.z + .02);
+    }
   } else {
-    // 눈사람 가족: 높은 모자를 쓴 큰 눈사람과 주황 털모자의 꼬마 눈사람이 손을 잡고 있다
-    ball(.4, .38, -.28); ball(.27, 1.0, -.28);
-    for (const s of [-1, 1]) dot(m.coal, .026, -.28 + s * .1, 1.07, .24);
-    const nose = add(new THREE.ConeGeometry(.03, .17, 10), m.carrot, -.28, 1.0, .34); nose.rotation.x = Math.PI / 2;
-    add(new THREE.CylinderGeometry(.27, .27, .015, 24), m.black, -.28, 1.24, 0);
-    add(new THREE.CylinderGeometry(.15, .16, .3, 20), m.black, -.28, 1.4, 0);
-    add(new THREE.CylinderGeometry(.162, .162, .05, 20), m.red, -.28, 1.29, 0);
-    scarf(.8, .22, m.green, 0, -.28);
-    ball(.22, .21, .42); ball(.15, .55, .42);
-    for (const s of [-1, 1]) dot(m.coal, .018, .42 + s * .055, .59, .135);
-    const small = add(new THREE.ConeGeometry(.02, .09, 8), m.carrot, .42, .55, .19); small.rotation.x = Math.PI / 2;
-    add(new THREE.SphereGeometry(.155, 16, 10, 0, Math.PI * 2, 0, Math.PI * .5), m.orange, .42, .6, 0);
-    dot(m.white, .04, .42, .76, 0);
-    stick([.06, .62, .04], [.28, .42, .06]);
-    stick([-.62, .62, 0], [-.88, .86, .05]);
-    stick([.56, .4, 0], [.74, .52, .04], .012);
+    // 눈사람 가족: 높은 모자를 쓴 큰 눈사람과 초록 털모자의 꼬마 눈사람이 손을 잡고 있다
+    mound(.4, -.28); ball(.4, .38, -.28); ball(.27, 1.0, -.28);
+    for (const s of [-1, 1]) coal(.022, -.28 + s * .095, 1.07, .245);
+    carrot(-.28, 1.0, .25, .18, .03);
+    for (let k = 0; k < 5; k++) { const a = (k / 4 - .5) * 1.5; coal(.012, -.28 + Math.sin(a) * .13, .92 + (1 - Math.cos(a)) * .07, .24); }
+    add(new THREE.CylinderGeometry(.29, .29, .014, 40), m.felt, -.28, 1.235, 0);
+    add(new THREE.CylinderGeometry(.155, .165, .32, 36), m.felt, -.28, 1.4, 0);
+    add(new THREE.CylinderGeometry(.168, .168, .055, 36), m.ribbon, -.28, 1.29, 0);
+    scarf(.8, .22, m.redKnit, -.28);
+    twig([-.62, .62, 0], [-.92, .88, .06]);
+    mound(.24, .44); ball(.22, .21, .44); ball(.15, .55, .44);
+    for (const s of [-1, 1]) coal(.016, .44 + s * .055, .6, .135);
+    carrot(.44, .56, .14, .1, .02);
+    beanie(.55, .15, m.greenKnit, m.greenRib, m.redKnit, .44);
+    scarf(.43, .12, m.redKnit, .44);
+    twig([-.04, .62, .04], [.24, .44, .08], .014, 1);
+    twig([.58, .42, 0], [.78, .55, .04], .012, 1);
+    // 둘을 함께 가운데에 오게 조금 왼쪽으로
+    for (const o of g.children) o.position.x -= .1;
   }
   return g;
 }
