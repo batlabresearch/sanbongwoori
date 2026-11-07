@@ -53,6 +53,7 @@ button { cursor: pointer; }
 .board .remain { font-family: var(--display); font-weight: 800; font-size: 25px; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .board .remain small { font-family: var(--ui); font-weight: 500; font-size: 13px; margin-left: 3px; }
 .board .meta { font-size: 12px; color: var(--carve-dim); font-variant-numeric: tabular-nums; }
+.board .nw { white-space: nowrap; }
 .board .next { font-size: 12px; color: var(--ribbon); font-variant-numeric: tabular-nums; }
 
 .tool {
@@ -67,19 +68,30 @@ button { cursor: pointer; }
 .volume input { width: 96px; margin: 0; accent-color: var(--ribbon); }
 
 .dash {
-  justify-self: center; width: min(760px, 100%); pointer-events: auto;
-  display: grid; grid-template-columns: minmax(150px, 196px) minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  justify-self: center; width: min(840px, 100%); pointer-events: auto;
+  display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 14px;
   padding: 10px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--shade);
 }
-.stamina { display: grid; gap: 6px; }
-.stamina-head { display: flex; align-items: baseline; gap: 6px; font-size: 13px; color: var(--carve-dim); }
-.stamina-head b { color: var(--carve); font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.stamina-head .speed { margin-left: auto; font-variant-numeric: tabular-nums; }
-.stamina-head .speed b { font-size: 14px; }
-.burn { margin: 0; display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--carve-dim); font-variant-numeric: tabular-nums; }
-.burn b { color: var(--carve); font-size: 16px; font-weight: 600; }
+/* 접기 단추: 펼쳐 있을 때는 아래(접기), 접혀 있을 때는 위(펼치기)를 가리킨다 */
+.dash-fold { width: 32px; height: 32px; padding: 0; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--carve); cursor: pointer; }
+.dash-fold svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; transform: rotate(180deg); transition: transform .2s; }
+.dash.folded .dash-fold svg { transform: none; }
+.dash-fold:focus-visible { outline: 2px solid var(--ribbon); outline-offset: 2px; }
+/* 한 줄 현황: 이름은 작게 위에, 숫자는 크게 아래에 */
+.stats { min-width: 0; display: flex; align-items: flex-end; gap: 16px; white-space: nowrap; }
+.stat { display: grid; gap: 2px; font-variant-numeric: tabular-nums; }
+.stat small { font-size: 11px; line-height: 1.1; color: var(--carve-dim); }
+.stat .val { display: flex; align-items: baseline; gap: 2px; line-height: 1.1; }
+.stat .val b { color: var(--carve); font-size: 19px; font-weight: 600; }
+.stat .val i { font-style: normal; font-size: 11.5px; color: var(--carve-dim); }
+/* 접으면 프로필과 파노라마 단추를 숨기고 한 줄로 */
+.dash.folded { grid-template-columns: auto minmax(0, 1fr) auto; padding: 6px 10px; gap: 10px; }
+.dash.folded #profile, .dash.folded .walk.look, .dash.folded .stat.speed { display: none; }
+.dash.folded .stat { display: flex; align-items: baseline; gap: 4px; }
+.dash.folded .stat .val b { font-size: 16px; }
+.dash.folded .walk { min-height: 38px; }
 #profile { width: 100%; height: 58px; display: block; min-width: 0; }
-#course-map-box { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(100px + env(safe-area-inset-bottom, 0px)); width: 260px; height: 260px; }
+#course-map-box { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(var(--dash-h, 74px) + 26px + env(safe-area-inset-bottom, 0px)); width: 260px; height: 260px; }
 #course-map { display: block; width: 100%; height: 100%; border: 1px solid var(--line); border-radius: 4px; background: var(--shade); }
 /* 축소하면 지금 크기의 1/5로 줄어든다 */
 #course-map-box.small { width: 52px; height: 52px; }
@@ -102,7 +114,7 @@ body.panorama #hud, body.panorama #tags, body.panorama #flower-tag, body.panoram
 .tag i { display: block; height: 3px; margin-top: 2px; background: var(--moss); border-radius: 1px; }
 
 #toast {
-  position: fixed; left: 50%; bottom: calc(112px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: calc(var(--dash-h, 74px) + 38px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
   max-width: min(460px, calc(100vw - 32px)); padding: 8px 13px; border-radius: 3px;
   background: var(--shade); font-size: 13px; text-align: center; pointer-events: none;
   opacity: 0; transition: opacity .3s;
@@ -358,22 +370,35 @@ h1 small { margin-left: 9px; font-family: var(--ui); font-weight: 500; font-size
   .peak-list { width: auto; max-height: 130px; flex-direction: row; flex-wrap: wrap; }
   .go-row { grid-template-columns: minmax(0, 1fr) auto; }
   .peak-card { grid-column: 1 / -1; }
-  .dash { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; }
-  .volume input { width: 68px; }
-  .walk { padding: 0 11px; font-size: 13px; }
-  #profile { grid-column: 1 / -1; grid-row: 2; height: 46px; }
-  #course-map-box { bottom: calc(148px + env(safe-area-inset-bottom, 0px)); width: 150px; height: 150px; }
+  .dash { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px 10px; padding: 8px 10px; }
+  .stats { grid-column: 2 / -1; justify-content: space-between; gap: 6px; }
+  .stat .val b { font-size: 16px; }
+  .stat small .long { display: none; }
+  #profile { grid-column: 1 / 3; grid-row: 2; height: 40px; }
+  .walk-set { grid-column: 3; grid-row: 2; }
+  .walk { min-height: 40px; padding: 0 11px; font-size: 13px; }
+  .dash.folded .stats { grid-column: 2; justify-content: flex-start; gap: 12px; }
+  .dash.folded .walk-set { grid-column: 3; grid-row: 1; }
+  .dash.folded .stat.kcal { display: none; }
+  .top { gap: 8px; }
+  .top-tools { gap: 6px; flex: none; }
+  .volume input { width: 44px; }
+  .volume { padding: 0 8px; gap: 6px; }
+  #volume-label { min-width: 0; white-space: nowrap; }
+  .top-tools .tool { white-space: nowrap; padding: 0 9px; }
+  .board { padding: 7px 26px 8px 11px; }
+  .board .remain { font-size: 21px; white-space: nowrap; }
+  .board .meta, .board .next { font-size: 11px; }
+  #course-map-box { width: 150px; height: 150px; }
   #course-map-box.small { width: 30px; height: 30px; }
-  #toast { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 }
 @media (prefers-reduced-motion: reduce) {
   h1, .peak, .region, .region-name, .pin-mark, .map-sea path, .peak-card.pop { animation: none; }
   .map-panel { transition: none; }
   .region { stroke-dashoffset: 0; fill-opacity: 1; }
 }
-.energy { position: relative; display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; }
-.energy .star { width: 17px; height: 17px; fill: #f5c542; stroke: #8a5a10; stroke-width: 1.2; }
-.energy b { font-size: 17px; }
+.energy { position: relative; }
+.energy .star { width: 15px; height: 15px; align-self: center; margin-right: 2px; fill: #f5c542; stroke: #8a5a10; stroke-width: 1.2; }
 #energy-pop { position: absolute; left: 18px; top: -4px; color: #f5c542; font-weight: 700; font-size: 14px; opacity: 0; pointer-events: none; }
 #energy-pop.on { animation: starUp 1.4s ease-out; }
 @keyframes starUp { 0% { opacity: 0; transform: translateY(6px) scale(.8); } 20% { opacity: 1; transform: translateY(-6px) scale(1.15); } 100% { opacity: 0; transform: translateY(-26px); } }
@@ -391,7 +416,7 @@ h1 small { margin-left: 9px; font-family: var(--ui); font-weight: 500; font-size
 .meet-gain { display: flex; align-items: center; gap: 6px; font-weight: 700; color: #f5c542; }
 .meet-gain .star { width: 20px; height: 20px; fill: #f5c542; stroke: #8a5a10; stroke-width: 1.2; }
 #meet-go { min-height: 42px; font-size: 14px; }
-#rest-end { position: fixed; left: 50%; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 31; min-width: 150px; }
+#rest-end { position: fixed; left: 50%; bottom: calc(var(--dash-h, 74px) + 44px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 31; min-width: 150px; }
 #rest-fx { position: fixed; left: 0; top: 0; z-index: 6; width: 96px; height: 96px; pointer-events: none; will-change: transform; }
 #rest-fx::before { content: ''; position: absolute; left: 50%; bottom: 0; width: 56px; height: 18px; margin-left: -28px; border-radius: 50%; border: 3px solid rgba(143, 230, 138, .85); box-shadow: 0 0 14px rgba(110, 220, 110, .9); animation: halo 1.6s ease-in-out infinite; }
 @keyframes halo { 50% { transform: scale(1.18); opacity: .6; } }
@@ -422,7 +447,7 @@ h1 small { margin-left: 9px; font-family: var(--ui); font-weight: 500; font-size
 .leaf-picks { width: 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .leaf-pick { min-height: 0; padding: 6px 2px; display: grid; justify-items: center; gap: 2px; font-size: 12px; }
 /* 실제 물건으로 하는 놀이의 안내 띠: 창 대신 한 줄 안내와 단추만 둔다 */
-#play-bar { position: fixed; left: 50%; bottom: calc(122px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 33; width: min(620px, calc(100vw - 32px)); padding: 10px 12px; display: grid; gap: 8px; border: 1px solid var(--ribbon); border-radius: 6px; background: var(--shade); animation: meetIn .35s ease-out; }
+#play-bar { position: fixed; left: 50%; bottom: calc(var(--dash-h, 74px) + 48px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 33; width: min(620px, calc(100vw - 32px)); padding: 10px 12px; display: grid; gap: 8px; border: 1px solid var(--ribbon); border-radius: 6px; background: var(--shade); animation: meetIn .35s ease-out; }
 #play-bar[hidden] { display: none; }
 #play-text { margin: 0; font-size: 14px; line-height: 1.45; text-align: center; font-variant-numeric: tabular-nums; }
 #play-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
@@ -471,7 +496,7 @@ body.panorama #game { visibility: hidden; }
 body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panorama #course-map-box { visibility: hidden; }
 @media (max-width: 660px) {
   #meet { top: calc(118px + env(safe-area-inset-top, 0px)); }
-  #rest-end { bottom: calc(160px + env(safe-area-inset-bottom, 0px)); }
+
 }
 @media (prefers-reduced-motion: reduce) {
   #drink.play .dipper { animation: none; opacity: 1; transform: translate(196px, 112px) rotate(-36deg); }
@@ -488,7 +513,7 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
     <div class="board">
       <p class="course" id="course-name"></p>
       <p class="remain"><span id="remain">0</span><small id="remain-unit">m 남음</small></p>
-      <p class="meta">고도 <span id="altitude">0</span> m · 경사 <span id="grade-value">0</span>% · <span id="surface-label"></span> · <span id="clock">0:00</span></p>
+      <p class="meta"><span class="nw">고도 <span id="altitude">0</span> m</span> · <span class="nw">경사 <span id="grade-value">0</span>%</span> · <span class="nw"><span id="surface-label"></span> · <span id="clock">0:00</span></span></p>
       <p class="next" id="next-poi"></p>
     </div>
     <div class="top-tools">
@@ -501,10 +526,14 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
     <canvas id="course-map" width="520" height="520" role="img" aria-label="실제 등산 코스 지도와 현재 위치"></canvas>
     <button class="tool map-zoom" id="map-zoom" type="button" aria-pressed="false">지도 축소</button>
   </div>
-  <section class="dash" aria-label="등산 현황">
-    <div class="stamina">
-      <div class="stamina-head">체력 <b id="stamina-value">0</b><span class="energy" title="기운"><svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.4l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.2l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg><b id="energy-value">0</b><span id="energy-pop"></span></span><span class="speed"><b id="speed-value">0</b> m/s</span></div>
-      <p class="burn"><span>소모 칼로리 <b id="kcal-value">0</b> kcal</span><span><b id="steps-value">0</b>보</span></p>
+  <section class="dash" id="dash" aria-label="등산 현황">
+    <button class="dash-fold" id="dash-fold" type="button" aria-expanded="true" aria-controls="dash" aria-label="현황판 접기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+    <div class="stats">
+      <span class="stat"><small>체력</small><span class="val"><b id="stamina-value">0</b></span></span>
+      <span class="stat energy" title="기운"><small>기운</small><span class="val"><svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.4l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.2l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg><b id="energy-value">0</b></span><span id="energy-pop"></span></span>
+      <span class="stat speed"><small>속도</small><span class="val"><b id="speed-value">0</b><i>m/s</i></span></span>
+      <span class="stat kcal"><small><span class="long">소모 </span>칼로리</small><span class="val"><b id="kcal-value">0</b><i>kcal</i></span></span>
+      <span class="stat"><small>걸음</small><span class="val"><b id="steps-value">0</b><i>보</i></span></span>
     </div>
     <canvas id="profile" role="img" aria-label="코스 고도 단면과 등산객 위치"></canvas>
     <div class="walk-set">
@@ -657,7 +686,7 @@ body.panorama #meet, body.panorama #rest-fx, body.panorama #rest-end, body.panor
       </div>
     </div>
     <p class="keys" id="keys">WASD·방향키로 걷기, 바닥 클릭으로 그 지점까지 걷기, 오른쪽 버튼을 누른 채 움직여 시점 바꾸기, 스페이스로 자동 등산, P로 파노라마, B로 도감.</p>
-    <p class="credit">등산로와 노면 자료: 한국등산트레킹지원센터, <a href="https://www.data.go.kr/data/15098177/fileData.do">공공데이터포털</a>, 한국관광공사 TourAPI, <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap 기여자</a> 사용 · 표고: NASA SRTM</p>
+    <p class="credit">등산로와 노면 자료: 한국등산트레킹지원센터, <a href="https://www.data.go.kr/data/15098177/fileData.do">공공데이터포털</a>, 한국관광공사 TourAPI, <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap 기여자</a> 사용 · 표고: NASA SRTM · 매미 소리: 윤기상, <a href="https://commons.wikimedia.org/wiki/Category:Hyalessa_maculaticollis">위키미디어 공용</a>(<a href="https://creativecommons.org/licenses/by/4.0/deed.ko">CC BY 4.0</a>, 잘라서 사용) · 개구리 소리: <a href="https://www.inaturalist.org/observations/282875766">karliatje</a>, <a href="https://www.inaturalist.org/observations/170678052">andrewbazdyrev</a>, iNaturalist(<a href="https://creativecommons.org/licenses/by/4.0/deed.ko">CC BY 4.0</a>, 잘라서 사용)</p>
   </div>
   <aside class="creator" aria-labelledby="creator-title">
     <h2 id="creator-title">캐릭터 만들기</h2>
@@ -872,6 +901,7 @@ function buildTrail(data) {
 const SURFACE = { dirt: 0, paved: 1, stairs: 2, scree: 3, rock: 4, rope: 5, deck: 6 };
 const SURFACE_LABEL = ['흙길', '포장길', '계단', '너덜길', '암릉', '밧줄 구간', '데크길'];
 const STAIR_GAP = .62;
+const START_GROUND = 45;
 
 function boxBlur(values, reach, passes = 1) {
   let out = values;
@@ -899,6 +929,8 @@ function describeTrail(data) {
   t.surface = new Uint8Array(n + 1);
   t.runs = (data.surf ?? []).map(([a, b, kind]) => ({ a: a * t.scale, b: b * t.scale, kind, stone: hash3(a, b, 3) < .42 }));
   readSpans(t);
+  // 출발 지점은 늘 흙길이나 자갈길이다(겨울에는 그 위가 눈길): 처음 START_GROUND m에 걸친 포장, 계단, 데크, 바위, 밧줄 구간은 그 뒤에서 시작한다
+  t.runs = t.runs.flatMap(run => run.a >= START_GROUND || run.kind === 'dirt' || run.kind === 'scree' ? [run] : run.b > START_GROUND ? [{ ...run, a: START_GROUND }] : []);
   for (const run of t.runs) t.surface.fill(SURFACE[run.kind] ?? 0, Math.round(run.a / t.ds), Math.min(n + 1, Math.round(run.b / t.ds)));
   t.water = (data.water ?? []).map(([s, d]) => ({ s: s * t.scale, d }));
   // 길에서 조금 떨어진 이름난 곳(봉우리, 절, 약수터 등)은 코스 지도에만 그 자리에 표시한다
@@ -931,6 +963,8 @@ function describeTrail(data) {
       }
       a = b;
     }
+    // 겨울 출발 지점은 반드시 눈길이다
+    raw.fill(1, 0, Math.min(n + 1, Math.round(START_GROUND / t.ds)));
     t.snow = boxBlur(raw, 3);
   }
   const channels = [0, 1, 2, 3].map(() => new Float32Array(n + 1));
@@ -1948,7 +1982,7 @@ function buildBackdrop() {
           vec3 fallTone = mix(vec3(.95, .68, .1), vec3(1.0, .4, .07), smoothstep(.35, .62, blotch + (speck - .5) * .5));
           fallTone = mix(fallTone, vec3(.45, .27, .1), smoothstep(.8, .92, speck));
           woods = mix(woods, fallTone * lum * 2.6, uSeason.x * smoothstep(.12, .3, speck + blotch * .5));
-          vec3 springTone = mix(woods * vec3(1.12, 1.18, .9), vec3(1.0, .62, .74) * lum * 3.2, smoothstep(.62, .7, speck) * .9);
+          vec3 springTone = mix(woods * vec3(1.12, 1.18, .9), vec3(1.0, .38, .72) * lum * 3.4, smoothstep(.55, .63, speck) * .9);
           woods = mix(woods, springTone, uSeason.y);
           woods = mix(woods, woods * vec3(.82, 1.06, .78), uSeason.z);
         }
@@ -2352,7 +2386,8 @@ const LEAF_BASE = { oak: '#82a84a', hornbeam: '#6f9e4c', chestnut: '#6a9440', ch
 const CONIFERS = new Set(['pine', 'koreanPine', 'fir', 'yew', 'gusang']);
 const LEAF_TONES = {
   // 벚꽃: 연분홍에서 진분홍까지
-  blossom: ['#fdeaf1', '#fbd9e6', '#f8c4d8', '#f4adc9', '#ef93b8', '#e9799f', '#e0608d'],
+  // 벚꽃: 베이비핑크에서 핫핑크까지. 푸른빛을 줄여 그늘에서도 보랏빛으로 보이지 않게 한다
+  blossom: ['#ffbcd2', '#ffa6c4', '#ff8fb5', '#ff77a6', '#ff5f98', '#fb4a8c', '#ffcadc', '#ff82ad'],
   // 봄 새잎: 밝은 연두
   fresh: ['#a8cf62', '#9cc85a', '#b5d872', '#8fbf52'],
   // 여름: 짙고 맑은 초록
@@ -2364,11 +2399,11 @@ const LEAF_TONES = {
 };
 const seasonColor = new THREE.Color(), seasonBase = new THREE.Color();
 const pickTone = (list, rand) => list[Math.floor(rand() * list.length) % list.length];
-// 계절에 따라 나무 종류를 바꾼다. 봄에는 나무의 3할이 벚꽃나무, 가을에는 단풍 드는 나무가 7할을 넘게 침엽수 일부를 활엽수로 바꾼다
+// 계절에 따라 나무 종류를 바꾼다. 봄에는 나무의 5할이 벚꽃나무, 가을에는 단풍 드는 나무가 7할을 넘게 침엽수 일부를 활엽수로 바꾼다
 function seasonTree(kind, decor, rand) {
   const now = course?.season ?? season;
   if (now === 'spring') {
-    if (rand() < .3) return 'cherry';
+    if (rand() < .5) return 'cherry';
     return kind === 'cherry' ? 'oak' : kind;
   }
   if (now === 'autumn' && CONIFERS.has(kind)) {
@@ -3818,8 +3853,8 @@ function* plantTile(tile) {
         if (!nearest(px, pz, 2.2)) put('bamboo', px, pz, { s: .8 + rand() * .5 });
       }
     }
-    // 꽃: 고도에 맞는 종이 길가에 무리 지어 핀다
-    // 봄에는 꽃이 여섯 배로 핀다
+    // 꽃: 고도에 맞는 종이 길가에 무리 지어 핀다(한 무더기에 네댓 포기)
+    // 봄에는 꽃이 여섯 배로 피고, 여름 꽃은 30% 크다
     for (let a = Math.round(attempts('flower') * seasonFx().flowers); a > 0; a--) {
       const { index, x, z } = roadside(1.8, 5.2, 1);
       if (rand() > decorAt(index).flower / PEAK.flower) continue;
@@ -3828,13 +3863,14 @@ function* plantTile(tile) {
       if (!options.length) continue;
       let roll = rand() * options.reduce((sum, f) => sum + f.weight, 0), flower = options[0];
       for (const f of options) { if ((roll -= f.weight) <= 0) { flower = f; break; } }
-      const name = `flora_${flower.id}`;
-      for (let n = flower.shrub ? 1 : 2 + Math.floor(rand() * 3); n > 0; n--) {
-        const fx = x + (rand() - .5) * (flower.shrub ? .6 : 1.7), fz = z + (rand() - .5) * (flower.shrub ? .6 : 1.7);
+      const name = `flora_${flower.id}`, grow = course.season === 'summer' ? 1.3 : 1;
+      const count = flower.shrub ? 1 + Math.floor(rand() * 2) : LOW ? 3 + Math.floor(rand() * 3) : 4 + Math.floor(rand() * 4), spread = flower.shrub ? 1 : 2.3;
+      for (let n = count; n > 0; n--) {
+        const fx = x + (rand() - .5) * spread, fz = z + (rand() - .5) * spread;
         if (nearest(fx, fz, flower.shrub ? 2.2 : 1.6) || summitSpot?.clear?.(fx, fz)) continue;
         const y = groundHeight(fx, fz);
-        put(name, fx, fz, { s: .95 + rand() * .3, y, color: [1, 1, 1] });
-        tile.flowers.push({ x: fx, y: y + (flower.shrub ? .9 : .35), z: fz, id: flower.id });
+        put(name, fx, fz, { s: (.95 + rand() * .3) * grow, y, color: [1, 1, 1] });
+        tile.flowers.push({ x: fx, y: y + (flower.shrub ? .9 : .35) * grow, z: fz, id: flower.id });
       }
     }
     yield;
@@ -4721,7 +4757,7 @@ function readSpans(t) {
   t.spans = [];
   for (const poi of t.pois) {
     if (siteKind(poi) !== 'bridge') continue;
-    const long = /출렁|구름|하늘|현수/.test(poi.label), half = long ? 20 : 7, a = Math.max(20, poi.s - half), b = Math.min(t.length - 30, poi.s + half);
+    const long = /출렁|구름|하늘|현수/.test(poi.label), half = long ? 20 : 7, a = Math.max(START_GROUND, poi.s - half), b = Math.min(t.length - 30, poi.s + half);
     if (b - a < 8 || t.spans.some(o => a < o.b + 20 && b > o.a - 20)) continue;
     t.spans.push({ a, b, long, depth: long ? 9 : 3.4, label: poi.label });
     t.runs = t.runs.flatMap(run => (run.b <= a || run.a >= b ? [run] : [...(run.a < a ? [{ ...run, b: a }] : []), ...(run.b > b ? [{ ...run, a: b }] : [])]));
@@ -5858,7 +5894,7 @@ function studioLayout(site, kind) {
 }
 const STUDIO_SEAT = .42, STUDIO_EAT = 10;
 function startStudio(site) {
-  const kinds = [...ANIMALS, ...MYTHS.filter(k => !k.flies)], kind = kinds[Math.floor(Math.random() * kinds.length)], beast = pool.get(kind.id);
+  const kinds = [...ANIMALS, ...mythPlan.map(plan => plan.kind).filter(k => !k.flies)], kind = kinds[Math.floor(Math.random() * kinds.length)], beast = pool.get(kind.id);
   if (beast.active) { beast.retire(); const i = beasts.indexOf(beast); if (i >= 0) beasts.splice(i, 1); }
   const spot = studioLayout(site, kind);
   site.acornMeshes?.forEach(m => { m.visible = true; });
@@ -8991,7 +9027,8 @@ function warmWild() {
   renderer.render(scene, camera);
   sample.root.visible = false;
 }
-function addBug(kind) {
+// mate를 주면 그 곤충의 무리로 곁에서 함께 난다(같은 터를 맴돌고 비슷한 때에 떠난다)
+function addBug(kind, mate = null) {
   const bug = { kind, age: 0, clock: 0, life: 14 + Math.random() * 16, vx: 0, vy: 0, vz: 0, yaw: Math.random() * 6.28, air: false, aim: { x: 0, y: 0, z: 0 }, x: 0, y: 0, z: 0, floor: 0 };
   const { way } = kind;
   if (way === 'perch') {
@@ -9003,6 +9040,12 @@ function addBug(kind) {
     const spot = besideTrail(7 + Math.random() * 16, 1, 3);
     Object.assign(bug, { x: spot.x, z: spot.z, life: 45 });
     bug.floor = bug.y = groundHeight(bug.x, bug.z) + .012;
+  } else if (mate) {
+    Object.assign(bug, { mate, home: mate.home, life: mate.life * (.8 + Math.random() * .4) });
+    bug.x = mate.x + (Math.random() - .5) * 3.2;
+    bug.z = mate.z + (Math.random() - .5) * 3.2;
+    bug.floor = groundHeight(bug.x, bug.z);
+    bug.y = bug.floor + .8 + Math.random() * .9;
   } else {
     const spot = besideTrail(9 + Math.random() * 20, 0, 4), flowers = way === 'dart' ? [] : flowersNear(spot.x, spot.z, 14);
     const flower = flowers.length && (way === 'hover' || Math.random() < .5) ? flowers[Math.floor(Math.random() * flowers.length)].flower : null;
@@ -9140,6 +9183,31 @@ function openSky() {
   return trees.filter(c => c.cam).length < 34;
 }
 let wishMyth = null;
+// 신비한 동물은 한 번 오를 때 서로 다른 두 마리만 나온다. 아직 못 본 동물을 먼저 뽑는다.
+// 땅에 사는 동물은 길의 앞쪽과 뒤쪽 정한 자리에서, 하늘을 나는 페가수스는 하늘이 트인 정상에서 나타난다
+let mythPlan = [];
+function planMyths() {
+  const left = MYTHS.slice(), picks = [];
+  while (picks.length < 2 && left.length) {
+    const fresh = left.filter(kind => !record.myths[kind.id]), kind = weighted(fresh.length ? fresh : left);
+    left.splice(left.indexOf(kind), 1);
+    picks.push(kind);
+  }
+  const L = trail.length, spots = [L * (.2 + Math.random() * .22), L * (.52 + Math.random() * .3)];
+  mythPlan = picks.map((kind, i) => ({ kind, at: kind.flies ? Math.max(0, L - 25) : spots[i], done: false, wait: 0 }));
+}
+function stepMythPlan(dt) {
+  // 한 번에 한 마리만. 알맞은 자리가 없으면 조금 뒤에 다시 찾는다
+  if (beasts.some(b => b.kind.myth)) return;
+  for (const plan of mythPlan) {
+    if (plan.done || player.s < plan.at) continue;
+    plan.wait -= dt;
+    if (plan.wait > 0) return;
+    if (addBeast(plan.kind)) plan.done = true;
+    else plan.wait = 4;
+    return;
+  }
+}
 function pickMyth() {
   const fresh = MYTHS.filter(kind => !record.myths[kind.id]);
   return weighted(fresh.length ? fresh : MYTHS);
@@ -9322,8 +9390,8 @@ function setupDrift() {
       k.addColorStop(0, 'rgba(255,255,255,1)'); k.addColorStop(.45, 'rgba(255,255,255,.8)'); k.addColorStop(1, 'rgba(255,255,255,0)');
       g.fillStyle = k; g.fillRect(-32, -32, 64, 64);
     });
-    // 가루눈, 보통 눈, 함박눈
-    for (const [count, size, speed] of [[LOW ? 500 : 1100, .06, .75], [LOW ? 260 : 560, .11, 1.05], [LOW ? 90 : 190, .2, 1.4]]) {
+    // 가루눈에서 함박눈까지 다섯 가지 크기. 큰 눈송이일수록 드물고 빨리 떨어진다
+    for (const [count, size, speed] of [[LOW ? 400 : 900, .04, .65], [LOW ? 340 : 760, .07, .8], [LOW ? 230 : 520, .11, 1], [LOW ? 125 : 280, .16, 1.2], [LOW ? 60 : 130, .24, 1.45]]) {
       const pos = new Float32Array(count * 3), seeds = new Float32Array(count);
       for (let i = 0; i < count; i++) { scatter(i * 3, pos); seeds[i] = Math.random() * 100; }
       const geo = new THREE.BufferGeometry();
@@ -9396,7 +9464,7 @@ function setupDrift() {
   };
   const spring = now === 'spring', tones = spring ? LEAF_TONES.blossom : [...LEAF_TONES.yellow, ...LEAF_TONES.orange, ...LEAF_TONES.orange, ...LEAF_TONES.brown];
   // [모양, 장수]. 가을 잎은 예전의 절반
-  const looks = spring ? [[petal(0), 120], [petal(4), 120]] : [[maple(11), 22], [maple(29), 22], [maple(47), 22], [ginkgo, 23], [oak, 23]];
+  const looks = spring ? [[petal(0), 240], [petal(4), 240]] : [[maple(11), 29], [maple(29), 29], [maple(47), 29], [ginkgo, 30], [oak, 30]];
   const size = spring ? .08 : .19, tone = new THREE.Color(), density = driftDensity();
   for (const [look, count] of looks) {
     const each = Math.max(4, Math.round(count * (LOW ? .5 : 1)));
@@ -9430,7 +9498,9 @@ function stepDrift(dt) {
   const cam = driftAnchor(), B = drift.box, t = drift.t;
   const wrap = (get, set) => {
     let [x, y, z] = get();
-    if (y < cam.y - 3 || y > cam.y + 9) { x = cam.x + (Math.random() - .5) * 2 * B; z = cam.z + (Math.random() - .5) * 2 * B; y = y < cam.y - 3 ? cam.y + 6 + Math.random() * 2.5 : cam.y - 2; }
+    // 카메라가 멀리 건너뛰었으면(순간이동, 처음 비행) 위아래로 고르게 다시 뿌리고, 평소에는 바닥에 닿은 것만 위에서 다시 떨어뜨린다
+    if (Math.abs(y - cam.y) > 16 || Math.abs(x - cam.x) > 3 * B || Math.abs(z - cam.z) > 3 * B) { x = cam.x + (Math.random() - .5) * 2 * B; z = cam.z + (Math.random() - .5) * 2 * B; y = cam.y - 2 + Math.random() * 10; }
+    else if (y < cam.y - 3 || y > cam.y + 9) { x = cam.x + (Math.random() - .5) * 2 * B; z = cam.z + (Math.random() - .5) * 2 * B; y = y < cam.y - 3 ? cam.y + 6 + Math.random() * 2.5 : cam.y - 2; }
     if (x - cam.x > B) x -= 2 * B; else if (x - cam.x < -B) x += 2 * B;
     if (z - cam.z > B) z -= 2 * B; else if (z - cam.z < -B) z += 2 * B;
     set(x, y, z);
@@ -9485,7 +9555,9 @@ function stepDrift(dt) {
 
 /* ---------- 여름 계곡의 개구리: 물가에 앉아 목을 부풀리다가 폴짝 뛴다 ---------- */
 const frogs = [], FROG_LIMIT = LOW ? 2 : 3;
-let frogGeo = null, frogMat = null, frogClock = 3;
+let frogGeo = null, frogMat = null, frogClock = 3, autumnFrog = false;
+// 개구리가 나오는 계절: 봄·여름은 계곡마다, 가을은 산행마다 한 번
+const frogSeason = () => { const now = course?.season ?? season; return now === 'spring' || now === 'summer' ? 'often' : now === 'autumn' ? 'once' : null; };
 function frogModel() {
   frogGeo ??= (() => {
     const m = newSolid();
@@ -9520,13 +9592,21 @@ function frogBank() {
   return { x: p.x + Math.cos(a) * r, z: p.z + Math.sin(a) * r };
 }
 function stepFrogs(dt) {
-  if ((course?.season ?? season) !== 'summer' || !trail?.streams.length) return;
+  const mode = frogSeason();
+  if (!mode || !trail?.streams.length) return;
   frogClock -= dt;
+  // 계곡에 다다랐는데 개구리가 하나도 없으면 바로 내보낸다
+  if (!frogs.length) frogClock = Math.min(frogClock, .3);
   if (frogClock <= 0) {
     frogClock = 4 + Math.random() * 4;
-    if (frogs.length < FROG_LIMIT) {
+    if (frogs.length < (mode === 'once' ? 1 : FROG_LIMIT) && !(mode === 'once' && autumnFrog)) {
       const spot = frogBank();
-      if (spot) frogs.push({ mesh: frogModel(), x: spot.x, z: spot.z, y: groundHeight(spot.x, spot.z), yaw: Math.random() * 6.283, rest: 1 + Math.random() * 3, hop: null, t: 0 });
+      if (spot) {
+        const frog = { mesh: frogModel(), x: spot.x, z: spot.z, y: groundHeight(spot.x, spot.z), yaw: Math.random() * 6.283, rest: 1 + Math.random() * 3, hop: null, t: 0 };
+        frogs.push(frog);
+        // 가을: 이번 산행의 단 한 마리. 나오면서 한 번 운다
+        if (mode === 'once') { autumnFrog = true; sound.frog(Math.random() < .5 ? 0 : 1, .85); }
+      }
     }
   }
   for (let i = frogs.length - 1; i >= 0; i--) {
@@ -9557,16 +9637,19 @@ function stepFrogs(dt) {
   }
 }
 
-// 여름 소리: 숲에는 매미 세 가지, 계곡 가까이에서는 개구리 두 가지
+// 여름 숲에는 매미 녹음 세 조각(참매미 두 소절, 애매미 한 조각). 봄·여름 계곡 가까이에서는 개구리 두 가지(가을은 한 번)
 const natureClock = { cicada: 3, frog: 2 };
 function stepNatureSound(dt) {
-  if ((course?.season ?? season) !== 'summer') return;
-  natureClock.cicada -= dt;
-  if (natureClock.cicada <= 0) { natureClock.cicada = 4.5 + Math.random() * 7; sound.cicada(); }
+  if ((course?.season ?? season) === 'summer') {
+    natureClock.cicada -= dt;
+    if (natureClock.cicada <= 0) { natureClock.cicada = 4.5 + Math.random() * 7; sound.cicada(); }
+  }
+  // 개구리 녹음은 한 조각이 5~7초라 2.5초 넘게 사이를 둔다. 가을 개구리는 stepFrogs에서 한 번만 운다
+  if (frogSeason() !== 'often') return;
   natureClock.frog -= dt;
   if (natureClock.frog <= 0) {
     const wet = trail?.streams.length ? waterLevel() : 0;
-    natureClock.frog = wet > .2 ? 1.6 + Math.random() * 3.2 / wet : 2;
+    natureClock.frog = wet > .2 ? 2.5 + Math.random() * 4 / wet : 1;
     if (wet > .2) sound.frog(Math.random() < .55 ? 0 : 1, Math.min(1, wet * 1.3));
   }
 }
@@ -9575,7 +9658,11 @@ function stepWild(dt) {
   const fx = seasonFx();
   if (wildClock.bug <= 0) {
     wildClock.bug = (24 + Math.random() * 12) / Math.max(fx.bugs, .5);
-    if (fx.bugs > 0 && bugs.length < Math.round(WILD_LIMIT.bugs * fx.bugs)) addBug(weighted(seasonBugs()).kind);
+    // 수 제한은 무리 하나를 한 번으로 센다. 나비와 잠자리는 1~5마리가 함께 나온다
+    if (fx.bugs > 0 && bugs.filter(bug => !bug.mate).length < Math.round(WILD_LIMIT.bugs * fx.bugs)) {
+      const { kind } = weighted(seasonBugs()), first = addBug(kind);
+      if (first && (kind.way === 'flutter' || kind.way === 'dart')) for (let n = Math.floor(Math.random() * 5); n > 0; n--) addBug(kind, first);
+    }
   }
   const small = beasts.filter(b => !b.kind.big && !b.kind.myth).length, big = beasts.filter(b => b.kind.big && !b.kind.myth).length;
   if (wildClock.small <= 0) {
@@ -9586,11 +9673,7 @@ function stepWild(dt) {
     // 알맞은 자리가 없으면 조금 뒤에 다시 찾는다
     wildClock.big = big < WILD_LIMIT.big && addBeast(pickBeast(bigAnimals)) ? 540 + Math.random() * 120 : 6;
   }
-  if (wildClock.myth <= 0) {
-    const out = beasts.some(b => b.kind.myth), done = !out && addBeast(wishMyth ?? pickMyth());
-    if (done) wishMyth = null;
-    wildClock.myth = done ? 420 + Math.random() * 120 : 8;
-  }
+  stepMythPlan(dt);
   if (wildClock.buzz <= 0) {
     wildClock.buzz = (70 + Math.random() * 110) / Math.max(fx.bugs, .5);
     if (fx.bugs > 0) sound.buzz(flyerSide());
@@ -9641,6 +9724,134 @@ function groundSurface() {
   return 'dirt';
 }
 
+// 매미 울음: 배의 발음막이 아주 빠르게 딸깍이는 소리(짧은 잡음 딸깍임의 열)를 몸통의 울림(높이가 움직이는 띠 거르개)이 키운다.
+// 맑은 음이 아니라 거칠게 '지글거리는' 소리이고, 울림 높이가 낮았다 높았다 하며 'ㅁ-애-ㅁ'처럼 입을 열고 닫는다.
+// kind 0 참매미 '맴맴맴… 매애앰', 1 말매미 '쐐애애애', 2 쓰름매미 '쓰름 쓰름'. 가장 큰 값을 1로 맞춘 Float32Array를 돌려준다
+function cicadaVoice(kind, sr, seed = 1) {
+  let state = seed >>> 0 || 1;
+  const rand = () => { state = state + 0x6d2b79f5 >>> 0; let t = state; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const sm = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+  // shape(t): 그 시각의 [세기, 딸깍임 빠르기(Hz), 울림 높이(Hz), 쉿소리 섞임(0~1)]
+  let total, shape;
+  if (kind === 0) {
+    const count = 10 + Math.floor(rand() * 5), beat = .29 + rand() * .03, tail = 1.4;
+    total = count * beat + tail + .1;
+    shape = t => {
+      const k = Math.floor(t / beat);
+      if (k < count) {
+        // '맴': 닫힌 'ㅁ'에서 울림이 높아지며 '애'로 열렸다가 다시 'ㅁ'으로 닫힌다. 앞의 몇 번은 작게 시작한다
+        const u = (t - k * beat) / (beat * .84), grow = Math.min(1, .45 + k / 5);
+        if (u > 1) return [0, 190, 3000, 0];
+        const amp = sm(0, .16, u) * (1 - sm(.68, 1, u)) * grow;
+        const fc = u < .35 ? 2500 + 2800 * sm(0, .35, u) : u < .65 ? 5300 - 600 * sm(.35, .65, u) : 4700 - 2300 * sm(.65, 1, u);
+        return [amp, 175 + 40 * Math.sin(Math.PI * u), fc, .08];
+      }
+      // 마지막 '매애애앰': 활짝 열렸다가 천천히 닫히며 잦아든다
+      const u = (t - count * beat) / tail;
+      if (u > 1) return [0, 150, 2200, 0];
+      const amp = sm(0, .08, u) * (1 - sm(.55, 1, u));
+      const fc = u < .15 ? 2500 + 2900 * sm(0, .15, u) : 5400 - 3100 * sm(.15, 1, u);
+      return [amp, 205 - 60 * u, fc, .06];
+    };
+  } else if (kind === 1) {
+    // 말매미: 빠르고 거친 딸깍임이 길게 이어지며 '쐐애애애' 울다가 잦아든다
+    total = 6.5 + rand() * 2;
+    shape = t => {
+      const amp = sm(0, 1.4, t) * (1 - sm(total - 2.2, total - .05, t)) * (.8 + .2 * Math.sin(t * 2 * Math.PI * 5.5));
+      return [amp, 260 + 20 * Math.sin(t * 1.3), 4300 + 350 * Math.sin(t * 2 * Math.PI * .6), .22];
+    };
+  } else {
+    // 쓰름매미: 밝은 쉿소리 '쓰' 다음에 낮아지며 혀를 굴리듯 떨리는 '름'
+    const units = 7 + Math.floor(rand() * 4), unit = .6;
+    total = units * unit + .2;
+    shape = t => {
+      const k = Math.floor(t / unit), u = (t - k * unit) / unit;
+      if (k >= units) return [0, 130, 4000, 0];
+      if (u < .3) { const v = u / .3; return [sm(0, .4, v) * (.6 + .4 * v), 300, 6800 - 600 * v, .85]; }
+      if (u < .85) { const v = (u - .3) / .55, trill = .55 + .45 * Math.sin(2 * Math.PI * 26 * t); return [(1 - sm(.55, 1, v)) * trill, 140, 4200 - 900 * v, .15]; }
+      return [0, 140, 3500, 0];
+    };
+  }
+  const n = Math.ceil(total * sr), raw = new Float32Array(n), hiss = new Float32Array(n), out = new Float32Array(n);
+  for (let i = 0; i < n; i++) hiss[i] = rand() * 2 - 1;
+  // 1) 딸깍임의 열: 한 번에 1 ms쯤 울리고 사라지는 잡음 딸깍임을 빠르기에 맞춰 조금씩 어긋나게 놓는다
+  for (let at = 0; at < n;) {
+    const rate = shape(at / sr)[1], len = Math.floor(sr * .004), decay = sr * (.0007 + rand() * .0004), sign = rand() < .5 ? -1 : 1, g = .7 + rand() * .6;
+    for (let j = 0; j < len && at + j < n; j++) raw[at + j] += sign * g * Math.exp(-j / decay) * (rand() * 2 - 1 + (j < 3 ? 1.5 : 0));
+    at += Math.max(1, Math.round(sr / rate * (.92 + rand() * .16)));
+  }
+  // 2) 몸통 울림: 높이가 움직이는 좁은 띠 거르개 하나와 넓은 띠 거르개 하나를 겹친다(32표본마다 새로 구한다)
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0, q1 = 0, q2 = 0, p1 = 0, p2 = 0, b0 = 0, b2 = 0, a1 = 0, a2 = 0, c0 = 0, c2 = 0, d1 = 0, d2 = 0;
+  let ampFrom = 0, ampTo = 0, mix = 0, peak = 0;
+  for (let i = 0; i < n; i++) {
+    if (i % 32 === 0) {
+      const [amp, , fc, m] = shape(i / sr);
+      ampFrom = ampTo; ampTo = amp; mix = m;
+      const w = 2 * Math.PI * Math.min(fc, sr * .45) / sr, al = Math.sin(w) / (2 * 2.6), a0 = 1 + al;
+      b0 = al / a0; b2 = -al / a0; a1 = -2 * Math.cos(w) / a0; a2 = (1 - al) / a0;
+      const w2 = 2 * Math.PI * Math.min(fc * 1.15, sr * .45) / sr, al2 = Math.sin(w2) / (2 * 1.1), e0 = 1 + al2;
+      c0 = al2 / e0; c2 = -al2 / e0; d1 = -2 * Math.cos(w2) / e0; d2 = (1 - al2) / e0;
+    }
+    const x = raw[i] * (1 - mix) + hiss[i] * mix * .6;
+    const y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x; y2 = y1; y1 = y;
+    const z = c0 * y + c2 * q2 - d1 * p1 - d2 * p2; q2 = q1; q1 = y; p2 = p1; p1 = z;
+    out[i] = z * (ampFrom + (ampTo - ampFrom) * (i % 32) / 32);
+    peak = Math.max(peak, Math.abs(out[i]));
+  }
+  if (peak > 0) for (let i = 0; i < n; i++) out[i] /= peak;
+  return out;
+}
+
+// 약수터 물소리: 대롱에서 떨어지는 가는 물줄기가 돌확에 '졸졸졸' 떨어진다.
+// 작은 물방울·거품이 터질 때마다 짧게 '똘' 하고 높이가 살짝 올라가며 울리는 소리(거품 울림)를 잔뜩 겹치고,
+// 물줄기가 쏟아지는 '쏴' 소리를 아주 작게 깐다. 물줄기 세기가 1초에 몇 번씩 출렁여 '졸-졸-졸' 하는 마디가 생긴다.
+// 끝과 처음이 이어지도록 만들어(되풀이 재생) 가장 큰 값을 1로 맞춘 Float32Array를 돌려준다
+function trickleVoice(sr, seconds = 8, seed = 7) {
+  let state = seed >>> 0 || 1;
+  const rand = () => { state = state + 0x6d2b79f5 >>> 0; let t = state; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const n = Math.round(sr * seconds), out = new Float32Array(n), TAU = Math.PI * 2;
+  // 물줄기 세기: 한 바퀴(seconds)에 딱 맞는 사인 몇 개를 겹쳐 0.35~1 사이에서 출렁인다(졸졸 마디는 4~7 Hz)
+  const waves = [[1, .25], [3, .2], [7, .15], [33, .35], [41, .3], [52, .25]].map(([k, a]) => [TAU * k / seconds, a, rand() * TAU]);
+  const flow = t => { let v = 0; for (const [w, a, p] of waves) v += a * Math.sin(w * t + p); return Math.min(1, Math.max(.45, .7 + v * .4)); };
+  // 1) 거품 울림: 반지름이 작을수록 높고 짧다. 1초에 평균 110개쯤, 물줄기가 셀 때 더 많이
+  for (let t = 0; t < seconds;) {
+    t += -Math.log(1 - rand()) / (170 * flow(t) ** 2);
+    if (t >= seconds) break;
+    const f0 = 950 * Math.pow(4.6, rand() ** 1.15), life = (.003 + rand() * .01) * Math.sqrt(1800 / f0), rise = .1 + rand() * .3;
+    const amp = (.35 + rand() * .65) * Math.pow(1800 / f0, .5) * flow(t), len = Math.ceil(life * 5 * sr), start = Math.floor(t * sr);
+    let phase = rand() * TAU;
+    for (let j = 0; j < len; j++) {
+      const u = j / sr, f = f0 * (1 + rise * Math.min(1, u / (life * 3)));
+      phase += TAU * f / sr;
+      const env = Math.exp(-u / life) * Math.min(1, j / (sr * .0006));
+      out[(start + j) % n] += amp * env * Math.sin(phase);
+    }
+  }
+  // 2) 물줄기가 쏟아지는 '쏴': 2~6 kHz 잡음을 아주 작게, 세기에 따라. 되풀이 이음매가 없도록 두 바퀴 돌려 두 번째 값을 쓴다
+  const noise = new Float32Array(n);
+  for (let i = 0; i < n; i++) noise[i] = rand() * 2 - 1;
+  const w0 = TAU * 3600 / sr, al = Math.sin(w0) / (2 * .8), a0 = 1 + al;
+  const b0 = al / a0, b2 = -al / a0, a1 = -2 * Math.cos(w0) / a0, a2 = (1 - al) / a0;
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < n; i++) {
+      const x = noise[i], y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2;
+      x2 = x1; x1 = x; y2 = y1; y1 = y;
+      if (pass) out[i] += y * .07 * flow(i / sr);
+    }
+  }
+  let peak = 0;
+  for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(out[i]));
+  for (let i = 0; i < n; i++) out[i] /= peak;
+  return out;
+}
+
+// 게임에 넣은 매미 녹음(윤기상, CC BY 4.0). kind는 녹음을 못 불러왔을 때 대신 만들 cicadaVoice 종류, level은 크기 맞춤
+const CICADA_CLIPS = [{ name: 'cham-1', kind: 0, level: 1 }, { name: 'cham-2', kind: 0, level: 1 }, { name: 'ae-1', kind: 1, level: 1.5 }];
+// 약수터 대롱 곁에서 계곡 물소리보다 6 dB쯤 작게(소리 70에서 약 -27 dB)
+const TRICKLE_GAIN = .25;
+// 게임에 넣은 개구리 녹음(iNaturalist, CC BY 4.0): 사용자가 들어 보고 고른 청개구리 두 조각(일본 이즈 한 마리, 러시아 하산 합창). level은 크기 맞춤
+const FROG_CLIPS = [{ name: 'cheong-1', level: .9 }, { name: 'cheong-2', level: .6 }];
 class Sound {
   ctx = null; volume = 70; steps = {}; counts = { steps: 0, birds: 0, loud: 0, kinds: {} };
   start() {
@@ -9660,6 +9871,7 @@ class Sound {
     this.makeSteps();
     this.startWind();
     this.startWater();
+    this.startSpring();
     this.chorusLoop(300);
     this.chorusLoop(900);
     this.loudLoop(27000);
@@ -9802,6 +10014,24 @@ class Sound {
     this.waterLevel = level;
     if (this.water) this.water.gain.setTargetAtTime(level * .07, this.ctx.currentTime, .9);
   }
+  // 약수터: 대롱에서 떨어지는 물줄기가 '졸졸졸'. 8초 소리를 되풀이하고, 가까이 갈수록 커진다
+  startSpring() {
+    const { ctx } = this, data = trickleVoice(ctx.sampleRate), buffer = ctx.createBuffer(1, data.length, ctx.sampleRate);
+    buffer.copyToChannel(data, 0);
+    const source = ctx.createBufferSource(), send = ctx.createGain();
+    source.buffer = buffer;
+    source.loop = true;
+    this.spring = ctx.createGain();
+    this.spring.gain.value = 0;
+    send.gain.value = .3;
+    source.connect(this.spring);
+    this.spring.connect(this.master);
+    this.spring.connect(send).connect(this.room);
+    source.start();
+  }
+  setSpring(level) {
+    if (this.spring) this.spring.gain.setTargetAtTime(level * TRICKLE_GAIN, this.ctx.currentTime, .6);
+  }
   bubbleLoop() {
     setTimeout(() => {
       if (this.audible() && this.waterLevel > .08) {
@@ -9849,66 +10079,94 @@ class Sound {
     [880, 1175, 1568, 2093].forEach((f, i) => this.tone(bus, at + i * .13, .7, [[0, f], [1, f]], 1 - i * .14));
     setTimeout(() => bus.disconnect(), 2600);
   }
-  // 매미: 발음판이 빠르게 떨리는 딸깍임(톱니파)을 몸통의 울림(좁은 띠)으로 거른다. 0 참매미 '맴맴맴 매애앰', 1 말매미 길게 '쏴아아', 2 애매미 '씨유 씨유 쯔르르'
-  cicada(type = Math.floor(Math.random() * 3)) {
+  // 매미: 한반도에서 녹음한 실제 매미 소리(윤기상, 위키미디어 공용, CC BY 4.0)를 잘라 쓴다.
+  // 녹음 세 조각(참매미 '맴맴맴… 매애앰' 두 소절, 애매미 한 조각) 가운데 하나를 고르게 튼다.
+  // 녹음을 아직 못 불러왔거나(파일로 연 페이지 등) 불러오지 못하면 cicadaVoice로 만든 소리로 대신한다
+  loadCicadas() {
+    if (!this.ctx || this.cicadaLoad) return this.cicadaLoad;
+    this.cicadaRec = [];
+    this.cicadaWait = CICADA_CLIPS.map(async (clip, i) => {
+      try {
+        const data = await (await fetch(`media/cicada-${clip.name}.wav`)).arrayBuffer();
+        this.cicadaRec[i] = await this.ctx.decodeAudioData(data);
+      } catch {}
+    });
+    return this.cicadaLoad = Promise.all(this.cicadaWait);
+  }
+  // 여름 산행을 시작하면 참매미 1번 녹음이 가까이에서 한 번 운다(첫 조각만 불러오면 바로 튼다)
+  cicadaStart() {
+    if (!this.ctx) return;
+    this.loadCicadas();
+    this.cicadaWait[0].then(() => this.cicada(0, .8));
+  }
+  cicada(clip = Math.floor(Math.random() * CICADA_CLIPS.length), near = Math.random()) {
     if (!this.audible()) return;
-    const { ctx } = this, at = ctx.currentTime + .05;
-    const click = ctx.createOscillator(), band = ctx.createBiquadFilter(), body = ctx.createBiquadFilter(), amp = ctx.createGain(), bus = ctx.createGain(), pan = ctx.createStereoPanner(), send = ctx.createGain();
-    click.type = 'sawtooth';
-    band.type = body.type = 'bandpass';
+    const { ctx } = this;
+    this.loadCicadas();
+    let buffer = this.cicadaRec?.[clip] ?? null;
+    // 녹음마다 크기가 달라 맞춘다(애매미는 높은 소리라 멀리서 더 작게 들린다)
+    const level = buffer ? CICADA_CLIPS[clip].level : 1;
+    if (!buffer) {
+      const { kind } = CICADA_CLIPS[clip], bank = this.cicadaBank ??= [];
+      bank[kind] ??= [11, 29].map(seed => {
+        const data = cicadaVoice(kind, ctx.sampleRate, seed + kind * 101), made = ctx.createBuffer(1, data.length, ctx.sampleRate);
+        made.copyToChannel(data, 0);
+        return made;
+      });
+      buffer = bank[kind][Math.floor(Math.random() * 2)];
+    }
+    const source = ctx.createBufferSource(), low = ctx.createBiquadFilter(), bus = ctx.createGain(), pan = ctx.createStereoPanner(), send = ctx.createGain();
+    source.buffer = buffer;
+    source.playbackRate.value = .97 + Math.random() * .06;
+    low.type = 'lowpass';
+    low.frequency.value = 5500 + near * 9000;
+    // 먼 매미도 새소리보다 조금 크게, 가까운 매미는 또렷하게
+    bus.gain.value = (.1 + near * .12) * level;
     pan.pan.value = Math.random() * 1.6 - .8;
-    send.gain.value = .55;
-    bus.gain.value = .045 + Math.random() * .035;
-    amp.gain.value = 0;
-    click.connect(band).connect(body).connect(amp).connect(bus).connect(pan);
+    send.gain.value = .5;
+    source.connect(low).connect(bus).connect(pan);
     pan.connect(this.master);
     pan.connect(send).connect(this.room);
-    let length;
-    if (type === 0) {
-      click.frequency.value = 230;
-      band.frequency.value = 3700; band.Q.value = 6; body.frequency.value = 3900; body.Q.value = 2;
-      const count = 10 + Math.floor(Math.random() * 6), beat = .27;
-      for (let k = 0; k < count; k++) {
-        const t = at + k * beat, swell = Math.min(1, .35 + k / count);
-        amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(swell, t + .03); amp.gain.setValueAtTime(swell, t + .14); amp.gain.linearRampToValueAtTime(0, t + .21);
-        band.frequency.setValueAtTime(3300, t); band.frequency.linearRampToValueAtTime(4200, t + .16);
-      }
-      const end = at + count * beat;
-      amp.gain.setValueAtTime(0, end); amp.gain.linearRampToValueAtTime(1, end + .12); amp.gain.setValueAtTime(1, end + .8); amp.gain.linearRampToValueAtTime(0, end + 1.5);
-      band.frequency.setValueAtTime(4100, end); band.frequency.linearRampToValueAtTime(3100, end + 1.5);
-      length = count * beat + 1.6;
-    } else if (type === 1) {
-      click.frequency.value = 150;
-      band.frequency.value = 4600; band.Q.value = 2.4; body.frequency.value = 5200; body.Q.value = 1.3;
-      length = 6 + Math.random() * 3;
-      amp.gain.setValueAtTime(0, at); amp.gain.linearRampToValueAtTime(1, at + 1.7); amp.gain.setValueAtTime(1, at + length - 2.2); amp.gain.linearRampToValueAtTime(0, at + length);
-      const lfo = ctx.createOscillator(), depth = ctx.createGain();
-      lfo.frequency.value = 46; depth.gain.value = .3;
-      lfo.connect(depth).connect(amp.gain);
-      lfo.start(at); lfo.stop(at + length + .1);
-    } else {
-      click.frequency.value = 380;
-      band.frequency.value = 6000; band.Q.value = 7; body.frequency.value = 5600; body.Q.value = 2.2;
-      let t = at;
-      for (let r = 0; r < 2; r++) {
-        for (let k = 0; k < 3; k++) {
-          amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(1, t + .04); amp.gain.linearRampToValueAtTime(.25, t + .26); amp.gain.linearRampToValueAtTime(0, t + .3);
-          band.frequency.setValueAtTime(6600, t); band.frequency.exponentialRampToValueAtTime(4300, t + .28);
-          t += .38;
-        }
-        for (let k = 0; k < 10; k++) { amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(.8, t + .015); amp.gain.linearRampToValueAtTime(0, t + .055); band.frequency.setValueAtTime(5300, t); t += .075; }
-        t += .35;
-      }
-      length = t - at;
-    }
-    click.start(at);
-    click.stop(at + length + .1);
-    click.onended = () => { bus.disconnect(); pan.disconnect(); send.disconnect(); };
+    source.onended = () => { low.disconnect(); bus.disconnect(); pan.disconnect(); send.disconnect(); };
+    source.start(ctx.currentTime + .05);
     this.counts.cicada = (this.counts.cicada ?? 0) + 1;
   }
-  // 개구리: 0 참개구리 '개굴개굴'(낮고 거칠게 두 마디), 1 청개구리 '깩깩깩'(높고 짧게 여러 번). near는 계곡과 가까운 정도
+  // 개구리: 청개구리 녹음(FROG_CLIPS)을 튼다. 못 불러왔으면 합성음 type 0 참개구리, 1 청개구리로 대신한다
+  // (합성음: 참개구리 '개굴개굴' 낮고 거칠게 두 마디, 청개구리 '깩깩깩' 높고 짧게 여러 번). near는 계곡과 가까운 정도
+  loadFrogs() {
+    if (!this.ctx || this.frogLoad) return this.frogLoad;
+    this.frogRec = [];
+    return this.frogLoad = Promise.all(FROG_CLIPS.map(async (clip, i) => {
+      try {
+        const data = await (await fetch(`media/frog-${clip.name}.wav`)).arrayBuffer();
+        this.frogRec[i] = await this.ctx.decodeAudioData(data);
+      } catch {}
+    }));
+  }
   frog(type = 0, near = 1) {
     if (!this.audible()) return;
+    this.loadFrogs();
+    // 녹음은 종류(type)와 상관없이 두 조각 가운데 하나를 고른다
+    const ready = FROG_CLIPS.map((clip, i) => this.frogRec?.[i] ? i : -1).filter(i => i >= 0);
+    if (ready.length) {
+      // 녹음: 물가에서 멀수록 작고 먹먹하게 들린다
+      const { ctx } = this, pick = ready[Math.floor(Math.random() * ready.length)];
+      const source = ctx.createBufferSource(), low = ctx.createBiquadFilter(), bus = ctx.createGain(), pan = ctx.createStereoPanner(), send = ctx.createGain();
+      source.buffer = this.frogRec[pick];
+      source.playbackRate.value = .96 + Math.random() * .08;
+      low.type = 'lowpass';
+      low.frequency.value = 2500 + near * 9000;
+      bus.gain.value = (.16 + Math.random() * .08) * near * FROG_CLIPS[pick].level;
+      pan.pan.value = Math.random() * 1.4 - .7;
+      send.gain.value = .45;
+      source.connect(low).connect(bus).connect(pan);
+      pan.connect(this.master);
+      pan.connect(send).connect(this.room);
+      source.onended = () => { low.disconnect(); bus.disconnect(); pan.disconnect(); send.disconnect(); };
+      source.start(ctx.currentTime + .04);
+      this.counts.frog = (this.counts.frog ?? 0) + 1;
+      return;
+    }
     const { ctx } = this, at = ctx.currentTime + .04, bus = ctx.createGain(), pan = ctx.createStereoPanner(), send = ctx.createGain(), low = ctx.createBiquadFilter();
     pan.pan.value = Math.random() * 1.4 - .7;
     send.gain.value = .6;
@@ -10337,7 +10595,7 @@ function arrive(hiker) {
   sound.summit();
   noteStone(hiker.arrivedAt);
   gainEnergy(1);
-  if (!record.myths.pegasus) { wishMyth = MYTHS.find(kind => kind.flies); wildClock.myth = 5; }
+  for (const plan of mythPlan) if (plan.kind.flies && !plan.done) plan.at = Math.min(plan.at, hiker.s);
   $('place').hidden = true;
   placeTimer = 0;
   startSummitPhoto(wasAuto);
@@ -10845,6 +11103,23 @@ function bindControls() {
     if (e.detail) e.currentTarget.blur();
   });
   $('promo-go').addEventListener('click', () => { closePromo(); enterHike(TRIAL.id); });
+  const dash = $('dash'), fold = $('dash-fold');
+  const setFold = folded => {
+    dash.classList.toggle('folded', folded);
+    fold.setAttribute('aria-expanded', String(!folded));
+    fold.setAttribute('aria-label', folded ? '현황판 펼치기' : '현황판 접기');
+  };
+  let foldSaved = null;
+  try { foldSaved = localStorage.getItem('oreumgil-dash'); } catch {}
+  setFold(foldSaved ? foldSaved === 'folded' : matchMedia('(max-width: 660px)').matches);
+  fold.addEventListener('click', e => {
+    const folded = !dash.classList.contains('folded');
+    setFold(folded);
+    try { localStorage.setItem('oreumgil-dash', folded ? 'folded' : 'open'); } catch {}
+    if (e.detail) e.currentTarget.blur();
+  });
+  // 지도와 알림은 현황판 높이를 따라 바로 위에 선다
+  new ResizeObserver(() => { if (dash.offsetHeight) document.documentElement.style.setProperty('--dash-h', `${dash.offsetHeight}px`); }).observe(dash);
   $('promo-close').addEventListener('click', closePromo);
   $('promo').addEventListener('click', e => { if (e.target === e.currentTarget) closePromo(); });
   $('auto').addEventListener('click', e => { toggleAuto(); if (e.detail) e.currentTarget.blur(); });
@@ -10907,7 +11182,7 @@ function placeEveryone(stamina) {
   });
   focus.copy(player.model.root.position);
 }
-/* ---------- 눈사람: 겨울 산길에 여덟 가지 가운데 세 가지가 서 있다. 보면 기운 +1 ---------- */
+/* ---------- 눈사람: 겨울 산길에 여덟 가지 가운데 두 가지가 서 있다. 보면 기운 +1 ---------- */
 const SNOWMEN = ['당근코 눈사람', '초록 털모자 눈사람', '양동이 눈사람', '잭오랜턴 눈사람', '오이코 눈사람', '호박 눈사람', '등산객 눈사람', '눈사람 가족'];
 // 부드러운 3차원 값 잡음: 눈 덩이의 울퉁불퉁함, 호박 골, 찌그러진 양동이에 쓴다
 function vnoise(x, y, z) {
@@ -11178,19 +11453,19 @@ function snowmanModel(design) {
   }
   return g;
 }
-// 겨울 산길: 길을 고르게 나눈 세 자리에 여덟 가지 가운데 세 가지를 세운다
+// 겨울 산길: 길의 앞쪽과 뒤쪽 두 자리에 여덟 가지 가운데 두 가지를 세운다
 const snowmen = [];
 function placeSnowmen() {
   for (const one of snowmen) { scene.remove(one.root); one.root.traverse(o => o.geometry?.dispose()); }
   snowmen.length = 0;
   if (!course?.winter || !trail) return;
-  // 오를 때마다 여덟 가지 가운데 세 가지를 새로 뽑는다
+  // 오를 때마다 여덟 가지 가운데 두 가지를 새로 뽑는다
   const rand = mulberry((course.seed ^ Math.floor(Math.random() * 1e9)) >>> 0), order = SNOWMEN.map((_, i) => i);
   for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-  order.length = 3;
+  order.length = 2;
   order.forEach((design, k) => {
     for (let tries = 0; tries < 12; tries++) {
-      const s = clamp(trail.length * (.2 + k * .28 + (rand() - .5) * .08), 40, trail.length - 40), p = trailAt(s), side = rand() < .5 ? -1 : 1, d = 2.4 + rand() * .5;
+      const s = clamp(trail.length * (.28 + k * .38 + (rand() - .5) * .08), 40, trail.length - 40), p = trailAt(s), side = rand() < .5 ? -1 : 1, d = 2.4 + rand() * .5;
       const x = p.x - p.tz * side * d, z = p.z + p.tx * side * d;
       if (siteBlocked(x, z) || summitSpot?.clear?.(x, z)) continue;
       const root = snowmanModel(design);
@@ -11217,6 +11492,11 @@ function beginHike(stamina) {
   if (pano.on) endPanorama();
   placeEveryone(stamina);
   placeSnowmen();
+  planMyths();
+  // 여름에는 출발하자마자 참매미 1번이 울고, 그 소리가 끝날 즈음부터 다른 매미가 섞여 운다
+  if (course.season === 'summer') { sound.cicadaStart(); natureClock.cicada = 9 + Math.random() * 3; }
+  autumnFrog = false;
+  if (frogSeason() && trail.streams.length) sound.loadFrogs();
   setupDrift();
   // 체험 코스는 10분이라 산짐승과 신비한 동물이 일찍 나온다
   if (course.trial) Object.assign(wildClock, { small: 20, big: 55, myth: 95 });
@@ -11666,7 +11946,7 @@ async function replaySummit(id) {
   state.replay = true;
   togglePanorama();
   pano.blend = 1;
-  if (!record.myths.pegasus || Math.random() < .35) { wishMyth = MYTHS.find(k => k.flies); wildClock.myth = 6; }
+  mythPlan = !record.myths.pegasus || Math.random() < .35 ? [{ kind: MYTHS.find(k => k.flies), at: 0, done: false, wait: 6 }] : [];
 }
 async function finishReplay() {
   state.replay = false;
@@ -12275,23 +12555,34 @@ function refreshHud() {
   drawProfile();
   drawCourseMap();
   sound.setHeight(altFrac(p.y));
-  sound.setWater(waterLevel());
+  sound.setWater(waterLevel(true));
+  sound.setSpring(springLevel());
   checkPlaces();
 }
 
-// 물소리는 눈에 보이는 물길, 폭포, 약수터 곁에서만 난다. 물길에서 40m쯤 멀어지면 들리지 않는다
-function waterLevel() {
+// 물소리는 눈에 보이는 물길과 폭포 곁에서만 난다. 물길에서 40m쯤 멀어지면 들리지 않는다(약수터는 springLevel로 따로)
+// volume이면 소리 크기로 쓴다: 계곡 물길은 2026-11-08 사용자 요청으로 30% 작게(폭포는 그대로). 개구리는 volume 없이 물가와의 거리만 본다
+const STREAM_VOLUME = .7;
+function waterLevel(volume = false) {
   let near = Infinity, level = 0;
   for (const stream of trail.streams) {
     if (player.s < stream.a - 90 || player.s > stream.b + 90) continue;
     for (const p of stream.points) near = Math.min(near, Math.hypot(p.x - player.x, p.z - player.z) - p.w);
   }
-  if (near < Infinity) level = 1 - smooth(6, 42, near);
+  if (near < Infinity) level = (volume ? STREAM_VOLUME : 1) * (1 - smooth(6, 42, near));
   for (const site of trail.sites) {
     if (site.x === undefined || Math.abs(site.s - player.s) > 120) continue;
     const d = Math.hypot(site.x - player.x, site.z - player.z);
     if (site.kind === 'fall') level = Math.max(level, 1 - smooth(10, 70, d));
-    else if (site.kind === 'spring' || site.kind === 'gourdGame') level = Math.max(level, .35 * (1 - smooth(3, 16, d)));
+  }
+  return level;
+}
+// 약수터 졸졸 소리: 대롱 곁에서 가장 크고 20m쯤 떨어지면 들리지 않는다
+function springLevel() {
+  let level = 0;
+  for (const site of trail.sites) {
+    if (site.x === undefined || Math.abs(site.s - player.s) > 60 || (site.kind !== 'spring' && site.kind !== 'gourdGame')) continue;
+    level = Math.max(level, 1 - smooth(2.5, 20, Math.hypot(site.x - player.x, site.z - player.z)));
   }
   return level;
 }
@@ -12819,7 +13110,7 @@ async function boot() {
       return { medianMs: +times[n >> 1].toFixed(1), worstMs: +times[n - 1].toFixed(1), pixelRatio: renderer.getPixelRatio(), size: [innerWidth, innerHeight] };
     },
     colliders() { collectColliders(player.x, player.z, 11); return around.slice(); },
-    HD, pano, togglePanorama, groundHeight, game, GAMES, openGame, closeGame, startStudio, startWorldGame, endWorldGame, STONES, summitWords, scenery, sceneView: () => farland?.view, sites: () => trail.sites, amen: () => amen, beginSite: begin, endRest, summitPhoto, stoneSpot: () => stoneSpot, streams: () => trail.streams, spans: () => trail.spans, stonePose: () => ({ x: stoneSpot.x, z: stoneSpot.z, floor: stoneSpot.y, cairn: cairnSpot }), cloudOpacity: () => cloudSea?.material.opacity ?? 0, record, openBook, closeBook, snowmanModel, SNOWMEN, snowmen: () => snowmen, drift, frogs, birds: () => birdFlock, seasonBugs, season: () => ({ season, pickedSeason, now: seasonNow(), course: course?.season }), showCertificate, drawCertificate, certInfo, keepCertificate, viewCertificate, replaySummit, portraitOf, saveBook, MYTHS, wild: { bugs, beasts, INSECTS, ANIMALS, Beast, addBug, addBeast, clearWild, step: stepWild, clock: wildClock, unseen },
+    HD, pano, togglePanorama, groundHeight, game, GAMES, openGame, closeGame, startStudio, startWorldGame, endWorldGame, STONES, summitWords, scenery, sceneView: () => farland?.view, sites: () => trail.sites, amen: () => amen, beginSite: begin, endRest, summitPhoto, stoneSpot: () => stoneSpot, streams: () => trail.streams, spans: () => trail.spans, stonePose: () => ({ x: stoneSpot.x, z: stoneSpot.z, floor: stoneSpot.y, cairn: cairnSpot }), cloudOpacity: () => cloudSea?.material.opacity ?? 0, record, openBook, closeBook, snowmanModel, SNOWMEN, snowmen: () => snowmen, mythPlan: () => mythPlan, drift, frogs, birds: () => birdFlock, seasonBugs, season: () => ({ season, pickedSeason, now: seasonNow(), course: course?.season }), showCertificate, drawCertificate, certInfo, keepCertificate, viewCertificate, replaySummit, portraitOf, saveBook, MYTHS, wild: { bugs, beasts, INSECTS, ANIMALS, Beast, addBug, addBeast, clearWild, step: stepWild, clock: wildClock, unseen },
     openFlora, refreshHud, checkPlaces, updateFlowerTag, flowerTarget: () => flowerNear, flora: FLORA, plantKinds: () => kinds, tilesFlowers: () => [...tiles.values()].flatMap(t => t.flowers),
     stats() {
       let instances = 0, ready = 0;
