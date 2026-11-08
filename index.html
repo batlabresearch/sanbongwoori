@@ -11140,7 +11140,8 @@ function bindControls() {
 }
 
 const START_STAMINA = 100;
-const INTRO_VIDEO = 'media/intro.mp4', INTRO_POSTER = 'media/intro.jpg';
+// 첫 화면 대표 화면은 글씨 없는 사진(intro-poster.jpg). intro.jpg는 글씨를 얹은 소개 그림이라 링크 미리보기와 다른 곳에서 가져다 쓴다
+const INTRO_VIDEO = 'media/intro.mp4', INTRO_POSTER = 'media/intro-poster.jpg';
 
 function toggleAuto() {
   if (state.finished || amen.photo || amen.act === 'drink') return;
